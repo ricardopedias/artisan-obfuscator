@@ -1,0 +1,43 @@
+{
+    "name": "plexi/laravel-obfuscator",
+    "description": "Ofuscador de código PHP para o artisan.",
+    "keywords": ["laravel","obfuscating","artisan"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Ricardo Pereira",
+            "email": "rpdesignerfly@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=7.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Obfuscator\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Obfuscator\\Tests\\": "tests/"
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "extra": {
+        "branch-alias": {
+            "dev-master": "1.0-dev"
+        },
+        "laravel": {
+            "providers": [
+                "Obfuscator\\ServiceProvider"
+            ],
+            "aliases": {
+                "Obfuscator": "Obfuscator\\Facade"
+            }
+        }
+    },
+    "require-dev": {
+        "illuminate/framework": "5.5.x"
+    }
+}
