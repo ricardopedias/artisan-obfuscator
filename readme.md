@@ -4,6 +4,9 @@
 
 Laravel Obfuscator é uma operação do artisan que permite exportar um projeto Laravel, gerando uma versão ofuscada do código PHP. Muito útil quando é necessário partilhar uma aplicação sem expor o código fonte.
 
+> **Atenção**:
+> Esta biblioteca está em fase de desenvolvimento. Use-a por sua conta e risco!
+
 Sinta-se à vontade para conferir os [releases](https://github.com/rpdesignerfly/laravel-obfuscator), a [licença](license.md) e a [documentação](docs/00-Home.md).
 
 ### Características
