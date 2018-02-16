@@ -16,6 +16,8 @@ class ObfuscateCommand extends Command
         '.env',
     ];
 
+    private $links = [];
+
     /**
      * The name and signature of the console command.
      *
@@ -139,9 +141,7 @@ class ObfuscateCommand extends Command
 
     private function obfuscateFile($origin, $destiny)
     {
-        $extension = pathinfo($origin, PATHINFO_EXTENSION);
-
-        if (strtolower($extension) !== 'php') {
+        if ($this->isPhpFile($origin) == false) {
 
             $this->error("Apenas arquivos PHP podem ser ofuscados!");
             return false;
@@ -177,27 +177,32 @@ class ObfuscateCommand extends Command
 
         foreach ($list as $item) {
 
+            // Os links será recriados no final
             if (is_link($origin . $this->ds . $item)) {
 
-                // recriar o link no fim
-
+                $this->links[$origin . $this->ds . $item] = readlink($origin . $this->ds . $item);
+                $this->info(
+                    "Link encontrado: " . $origin . $this->ds . $item
+                    ." > " . $this->links[$origin . $this->ds . $item]
+                    );
                 continue;
             }
             elseif (is_file($origin . $this->ds . $item) == true) {
 
                 if (in_array($item, $this->exclude_files) ) {
+
+                    $this->warn("Arquivo ignorado: " . $origin . $this->ds . $item);
                     continue;
                 }
 
-                if (strtolower(pathinfo($item, PATHINFO_EXTENSION)) == 'php') {
-
-
-                    
+                // Arquivos PHP
+                if ($this->isPhpFile($origin) == true) {
 
                     (new PhpObfuscator)
                         ->obfuscate($origin . $this->ds . $item)
                         ->save($destiny . $this->ds . $item);
                 }
+                // Arquivos não-PHP
                 else {
                     copy($origin . $this->ds . $item, $destiny . $this->ds . $item);
                 }
@@ -206,7 +211,13 @@ class ObfuscateCommand extends Command
             }
             elseif(is_dir($origin . $this->ds . $item) ) {
 
-                if (in_array($item, array_merge($this->exclude_dirs, ['.', '..'])) ) {
+                if (in_array($item, ['.', '..']) ) {
+                    continue;
+                }
+
+                if (in_array($item, $this->exclude_dirs) ) {
+
+                    $this->warn("Diretório ignorado: " . $origin . $this->ds . $item);
                     continue;
                 }
 
