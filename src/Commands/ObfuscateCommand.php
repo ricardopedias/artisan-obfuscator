@@ -7,6 +7,15 @@ use Obfuscator\Libs\PhpObfuscator;
 
 class ObfuscateCommand extends Command
 {
+    private $exclude_dirs = [
+        'vendor',
+        'node_modules',
+    ];
+
+    private $exclude_files = [
+        '.env',
+    ];
+
     /**
      * The name and signature of the console command.
      *
@@ -82,7 +91,10 @@ class ObfuscateCommand extends Command
 
     private function parsePath($path)
     {
-        if ($path[0] != '/') {
+        if ($path == '.') {
+            $path = base_path();
+        }
+        elseif ($path[0] != '/') {
             $path = trim($path, $this->ds);
             $path = base_path($path);
         }
@@ -156,7 +168,57 @@ class ObfuscateCommand extends Command
 
         $this->line("Ofuscando o diretório '{$origin}' para '{$destiny}'");
 
-        // ...
-
+        $this->searchFiles($origin, $destiny);
     }
+
+    private function searchFiles($origin, $destiny)
+    {
+        $list = scandir($origin);
+
+        foreach ($list as $item) {
+
+            if (is_link($origin . $this->ds . $item)) {
+
+                // recriar o link no fim
+
+                continue;
+            }
+            elseif (is_file($origin . $this->ds . $item) == true) {
+
+                if (in_array($item, $this->exclude_files) ) {
+                    continue;
+                }
+
+                if (strtolower(pathinfo($item, PATHINFO_EXTENSION)) == 'php') {
+
+
+                    
+
+                    (new PhpObfuscator)
+                        ->obfuscate($origin . $this->ds . $item)
+                        ->save($destiny . $this->ds . $item);
+                }
+                else {
+                    copy($origin . $this->ds . $item, $destiny . $this->ds . $item);
+                }
+
+
+            }
+            elseif(is_dir($origin . $this->ds . $item) ) {
+
+                if (in_array($item, array_merge($this->exclude_dirs, ['.', '..'])) ) {
+                    continue;
+                }
+
+                if (is_dir($destiny . $this->ds . $item) == false) {
+                    mkdir($destiny . $this->ds . $item, 0777, true);
+                }
+                
+                $this->searchFiles($origin . $this->ds . $item, $destiny . $this->ds . $item);
+
+            }
+
+        }
+    }
+
 }

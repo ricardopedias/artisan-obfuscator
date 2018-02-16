@@ -2,9 +2,211 @@
 
 namespace Obfuscator\Libs;
 
+/**
+ * Esta biblioteca ofusca o código PHP, adicionando dependencias que serão 
+ * exigidas no momento da reversão da ofuscação. 
+ * Para que os arquivos resultantes sejam executados com sucesso, o conteúdo 
+ * do arquivo RevertObfuscation.php deve estar acessível para o código ofuscado.
+ */
 class PhpObfuscator
 {
-	public function encode($filename)
+	private $obfuscated = '';
+
+	private $show_decode_errors = false;
+
+	public function obfuscate($origin_file)
+	{
+		if (strtolower(pathinfo($origin_file, PATHINFO_EXTENSION)) != 'php') {
+			throw new \Exception("Apenas arquivos PHP podem ser ofuscados!");
+		}
+
+		$contents = php_strip_whitespace($origin_file);
+
+		$this->obfuscated = $this->encode($contents);
+
+		return $this;
+	}
+
+	public function getObfuscated() 
+	{
+		return $this->obfuscated;
+	}
+
+	public function save($destiny)
+	{
+		file_put_contents($destiny, $this->obfuscated);
+
+		return $this;
+	}
+
+	public function enableDecodeErrors($enable = true)
+    {
+        $this->show_decode_errors = $enable;
+    }
+
+
+
+
+    
+    private function getDynamicFunctionName()
+    {
+        $functions_list = array(
+            'cfForgetShow',
+            'cryptOf',
+            'unsetZeros',
+            'deflatingNow',
+            'zeroizeCipher',
+            'iqutZ',
+            'sagaPlus'
+        );
+        
+        return $functions_list[array_rand($functions_list)];
+    }
+    
+    private function getDynamicKeyName()
+    {
+        $functions_list = array(
+            'decompressMD5',
+            'unsetLogger',
+            'loopNested',
+            'vorticeData',
+            'cipherBinary'
+        );
+        
+        return $functions_list[array_rand($functions_list)];
+    }
+    
+    /**
+     * Executa as preparações no código antes de ofuscar.
+     *
+     * @param string $code Código proveniente diretamente do arquivo PHP
+     * @return string
+     */
+    private function prepareCode($code)
+    {
+        $str = str_replace("<?php", "", $code);
+        $str = str_replace("<?", "", $str);
+        $str = str_replace("?>", "", $str);
+        //$str = str_replace("'", "\x22", $str);
+        $str = trim($str);
+
+        return $str;
+    }
+    
+    /**
+     * Transforma a string em código ASCII hexadecimal.
+     * 
+     * @param string $string
+     * @return string
+     */
+    private function toASCII($string)
+    {
+        $ascii = "";
+        for ($i = 0; $i < strlen($string); $i ++) {
+            $ascii .= '\x' . bin2hex($string{$i});
+        }
+        return $ascii;
+    }
+
+
+	private function encode($code, $levels = 1, $host = NULL)
+    {
+    	require_once('RevertObfuscation.php');
+
+        $prefix = '';
+        if ($this->show_decode_errors == FALSE) {
+            $prefix = '@';
+        }
+        
+        // Máximo de 3 levels
+        $levels = $levels>3 ? 3 : $levels;
+        
+        $functions_called = array();
+        for($x=0; $x < $levels; $x++) {
+            
+            $function_name = $this->getDynamicFunctionName();
+            $functions_called[] = $function_name;
+            $code = $function_name($code);
+        }
+
+        if ($levels == 1) {
+            
+            $function_name = $functions_called[0];
+            $key_name = $this->getDynamicKeyName();
+            
+            $str = '';       
+            $str.= $this->toASCII($prefix. "eval({$function_name}(");
+            $str.= "'" . $code . "'";
+            $str.= $this->toASCII(",{$key_name}())); ");
+            
+        }
+        elseif ($levels == 2) {
+            
+            $function_one = $functions_called[1];
+            $key_name = $this->getDynamicKeyName();
+            
+            $oneStr = "";
+            $oneStr.= $this->toASCII("{$function_one}(");
+            $oneStr.= "'" . $code . "'";
+            $oneStr.= $this->toASCII(",{$key_name}()) ");
+            
+            $function_two = $functions_called[0];
+            $key_name = $this->getDynamicKeyName();
+            
+            $str = "";
+            $str.= $this->toASCII($prefix. "eval({$function_two}(");
+            $str.= $oneStr;
+            $str.= $this->toASCII(",{$key_name}())); ");
+            
+        }
+        
+        elseif ($levels == 3) {
+            
+            $function_one = $functions_called[2];
+            $key_name = $this->getDynamicKeyName();
+            
+            $oneStr = "";
+            $oneStr.= $this->toASCII("{$function_one}(");
+            $oneStr.= "'" . $code . "'";
+            $oneStr.= $this->toASCII(",{$key_name}()) ");
+            
+            $function_two = $functions_called[1];
+            $key_name = $this->getDynamicKeyName();
+            
+            $twoStr = "";
+            $twoStr.= $this->toASCII("{$function_two}(");
+            $twoStr.= $oneStr;
+            $twoStr.= $this->toASCII(",{$key_name}()) ");
+            
+            $functionThree = $functions_called[0];
+            $key_name = $this->getDynamicKeyName();
+            
+            $str = "";
+            $str.= $this->toASCII($prefix. "eval({$functionThree}(");
+            $str.= $twoStr;
+            $str.= $this->toASCII(",{$key_name}())); ");
+            
+        }
+
+        /*
+        $host = $this->getHost();
+        $str = str2ASCII("if(obfhost()==\"{$host}\"){ @eval(obfinflate(\" ");
+        $str.= $encoded;
+        $str.= str2ASCII(" \",obfcode())); }");
+        */
+        
+        return $str;
+    }
+
+
+
+
+
+
+
+
+
+	public function encodesssssssssss($filename)
 	{
 	    global $obfuscate;
 	    
