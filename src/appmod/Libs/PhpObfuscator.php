@@ -19,7 +19,11 @@ class PhpObfuscator
 {
     private $obfuscated = '';
 
-    private $show_decode_errors = false;
+    private $encode_errors = [];
+
+    private $decode_errors = [];
+
+    private $enable_decode_errors = true;
 
     /**
      * Ofusca o arquivo especificado.
@@ -38,6 +42,11 @@ class PhpObfuscator
 
         $this->obfuscated = $this->obfuscateString($contents);
 
+        if ($this->obfuscated == false) {
+            $this->encode_errors[] = 'Código misto encontrado. Arquivo não ofuscado.';
+            $this->obfuscated = $contents;
+        }
+
         return $this;
     }
 
@@ -49,11 +58,16 @@ class PhpObfuscator
      * @param  [type]  $host     [description]
      * @return string
      */
-    public function obfuscateString($php_code)
+    public function obfuscateString(string $php_code)
     {
         $plain_code = $this->phpWrapperRemove($php_code);
+        if ($plain_code == false) {
+            return false;
+        }
 
-        return $this->phpWrapperAdd($plain_code);
+        $encoded = $this->encodeString($code, 1);
+
+        return $this->phpWrapperAdd($encoded);
     }
 
     /**
@@ -62,9 +76,17 @@ class PhpObfuscator
      * @param string $code Código php sem ofuscar
      * @return string
      */
-    protected function phpWrapperRemove(string $code) : string
+    protected function phpWrapperRemove(string $code)
     {
-        return trim(str_replace(["<?php", "<?", "?>"], "", $code));
+        $matches = [];
+        preg_match_all('/\<\?php|\<\?\=/i', $code, $matches);
+
+        // Código misto não será ofuscado
+        if(isset($matches[0]) && count($matches[0]) > 1) {
+            return false;
+        } else {
+            return trim(str_replace(["<?php", "<?", "?>"], "", $code));
+        }
     }
 
     /**
@@ -78,9 +100,37 @@ class PhpObfuscator
         return "<?php\n {$code}";
     }
 
-    protected function encodedWrapperAdd($code)
+    protected function encodedWrapperAdd($code) : string
     {
         return "eval(\"{$code}\");";
+    }
+
+    private function getDynamicFunctionName()
+    {
+        $functions = [
+            'cfForgetShow',
+            'cryptOf',
+            'unsetZeros',
+            'deflatingNow',
+            'zeroizeCipher',
+            'iqutZ',
+            'sagaPlus'
+        ];
+
+        return $functions[array_rand($functions)];
+    }
+
+    private function getDynamicKeyName()
+    {
+        $keys = [
+            'decompressMD5',
+            'unsetLogger',
+            'loopNested',
+            'vorticeData',
+            'cipherBinary'
+        ];
+
+        return $keys[array_rand($keys)];
     }
 
     /**
@@ -103,42 +153,96 @@ class PhpObfuscator
 
     public function enableDecodeErrors($enable = true)
     {
-        $this->show_decode_errors = $enable;
+        $this->enable_decode_errors = $enable;
     }
 
 
-
-
-
-    private function getDynamicFunctionName()
+    public function encodeString($code)
     {
-        $functions_list = array(
-            'cfForgetShow',
-            'cryptOf',
-            'unsetZeros',
-            'deflatingNow',
-            'zeroizeCipher',
-            'iqutZ',
-            'sagaPlus'
-        );
+        $prefix = '';
+        if ($this->enable_decode_errors == false) {
+            $prefix = '@';
+        }
 
-        return $functions_list[array_rand($functions_list)];
+        // Máximo de 3 levels
+        $levels = $levels>3 ? 3 : $levels;
+
+        $functionsCalled = array();
+        for($x=0; $x < $levels; $x++) {
+
+            $functionName = $this->getDynamicFunctionName();
+            $functionsCalled[] = $functionName;
+            $code = $functionName($code);
+        }
+
+        if ($levels == 1) {
+
+            $functionName = $functionsCalled[0];
+            $keyName = $this->getDynamicKeyName();
+
+            $str = '';
+            $str.= $this->toASCII($prefix. "eval({$functionName}(");
+            $str.= "'" . $code . "'";
+            $str.= $this->toASCII(",{$keyName}())); ");
+
+        }
+        elseif ($levels == 2) {
+
+            $functionOne = $functionsCalled[1];
+            $keyName = $this->getDynamicKeyName();
+
+            $oneStr = "";
+            $oneStr.= $this->toASCII("{$functionOne}(");
+            $oneStr.= "'" . $code . "'";
+            $oneStr.= $this->toASCII(",{$keyName}()) ");
+
+            $functionTwo = $functionsCalled[0];
+            $keyName = $this->getDynamicKeyName();
+
+            $str = "";
+            $str.= $this->toASCII($prefix. "eval({$functionTwo}(");
+            $str.= $oneStr;
+            $str.= $this->toASCII(",{$keyName}())); ");
+
+        }
+
+        elseif ($levels == 3) {
+
+            $functionOne = $functionsCalled[2];
+            $keyName = $this->getDynamicKeyName();
+
+            $oneStr = "";
+            $oneStr.= $this->toASCII("{$functionOne}(");
+            $oneStr.= "'" . $code . "'";
+            $oneStr.= $this->toASCII(",{$keyName}()) ");
+
+            $functionTwo = $functionsCalled[1];
+            $keyName = $this->getDynamicKeyName();
+
+            $twoStr = "";
+            $twoStr.= $this->toASCII("{$functionTwo}(");
+            $twoStr.= $oneStr;
+            $twoStr.= $this->toASCII(",{$keyName}()) ");
+
+            $functionThree = $functionsCalled[0];
+            $keyName = $this->getDynamicKeyName();
+
+            $str = "";
+            $str.= $this->toASCII($prefix. "eval({$functionThree}(");
+            $str.= $twoStr;
+            $str.= $this->toASCII(",{$keyName}())); ");
+
+        }
+
+        /*
+        $host = $this->getHost();
+        $str = str2ASCII("if(obfhost()==\"{$host}\"){ @eval(obfinflate(\" ");
+        $str.= $encoded;
+        $str.= str2ASCII(" \",obfcode())); }");
+        */
+
+        return $str;
     }
-
-    private function getDynamicKeyName()
-    {
-        $functions_list = array(
-            'decompressMD5',
-            'unsetLogger',
-            'loopNested',
-            'vorticeData',
-            'cipherBinary'
-        );
-
-        return $functions_list[array_rand($functions_list)];
-    }
-
-
 
     /**
      * Transforma a string em código ASCII hexadecimal.
