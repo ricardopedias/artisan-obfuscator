@@ -5,7 +5,7 @@ namespace Obfuscator\Commands;
 use Illuminate\Console\Command;
 use Obfuscator\Libs\PhpObfuscator;
 
-class BaseCommand extends Command
+abstract class BaseCommand extends Command
 {
 
     private $links = [];
@@ -32,6 +32,8 @@ class BaseCommand extends Command
         $this->obfuscator = $obfuscator;
     }
 
+    abstract protected function getBasePath();
+
     protected function getObfuscator()
     {
         return $this->obfuscator;
@@ -46,11 +48,11 @@ class BaseCommand extends Command
     protected function parsePath($path)
     {
         if ($path == '.') {
-            $path = base_path();
+            $path = $this->getBasePath();
         }
         elseif ($path[0] != '/') {
             $path = trim($path, $this->ds);
-            $path = base_path($path);
+            $path = $this->getBasePath() . $this->ds . $path;
         }
 
         return $path;
@@ -270,7 +272,7 @@ class BaseCommand extends Command
     {
         $this->line("Ofuscando o arquivo '{$origin}' para '{$destiny}'");
 
-        $ob = (new PhpObfuscator)->obfuscate_file($origin);
+        $ob = (new PhpObfuscator)->obfuscateFile($origin);
         if($ob == false) {
             $this->error("Ocorreu um erro ao tentar ofuscar o arquivo {$origin}");
             return false;

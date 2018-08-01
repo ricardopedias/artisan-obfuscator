@@ -14,20 +14,21 @@ class PhpObfuscator
     private $show_decode_errors = false;
 
     /**
-     * Ofusca o arquivo espeficidado.
+     * Ofusca o arquivo especificado.
      *
      * @param  string $origin_file
      * @return \Obfuscator\Libs\PhpObfuscator
      */
-    public function obfuscate_file($origin_file)
+    public function obfuscateFile($origin_file)
     {
         if (strtolower(pathinfo($origin_file, PATHINFO_EXTENSION)) != 'php') {
             throw new \Exception("Apenas arquivos PHP podem ser ofuscados!");
         }
 
+        // Remove os espaços e comentários do arquivo
         $contents = php_strip_whitespace($origin_file);
 
-        $this->obfuscated = $this->obfuscate_string($contents);
+        $this->obfuscated = $this->obfuscateString($contents);
 
         return $this;
     }
@@ -40,9 +41,38 @@ class PhpObfuscator
      * @param  [type]  $host     [description]
      * @return string
      */
-    public function obfuscate_string($php_code, $levels = 1, $host = NULL)
+    public function obfuscateString($php_code)
     {
-        return $php_code;
+        $plain_code = $this->phpWrapperRemove($php_code);
+
+        return $this->phpWrapperAdd($plain_code);
+    }
+
+    /**
+     * Remove os invólucros do PHP
+     *
+     * @param string $code Código php sem ofuscar
+     * @return string
+     */
+    protected function phpWrapperRemove(string $code) : string
+    {
+        return trim(str_replace(["<?php", "<?", "?>"], "", $code));
+    }
+
+    /**
+     * Adiciona os invólucros do PHP.
+     *
+     * @param  string $code
+     * @return string
+     */
+    protected function phpWrapperAdd(string $code) : string
+    {
+        return "<?php\n {$code}";
+    }
+
+    protected function encodedWrapperAdd($code)
+    {
+        return "eval(\"{$code}\");";
     }
 
     /**
@@ -100,22 +130,7 @@ class PhpObfuscator
         return $functions_list[array_rand($functions_list)];
     }
 
-    /**
-     * Executa as preparações no código antes de ofuscar.
-     *
-     * @param string $code Código proveniente diretamente do arquivo PHP
-     * @return string
-     */
-    private function prepareCode($code)
-    {
-        $str = str_replace("<?php", "", $code);
-        $str = str_replace("<?", "", $str);
-        $str = str_replace("?>", "", $str);
-        //$str = str_replace("'", "\x22", $str);
-        $str = trim($str);
 
-        return $str;
-    }
 
     /**
      * Transforma a string em código ASCII hexadecimal.

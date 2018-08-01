@@ -1,0 +1,30 @@
+#!/bin/bash
+
+#--------------------------------------------------------------------------
+# PhpUnit
+#--------------------------------------------------------------------------
+#
+# Para executar os testes de unidade em um pacote, é necessário invocar
+# o phpunit que acompanha o laravel, especificando o caminho de forma
+# relativa:
+#
+#     Ex:
+#     $ cd /caminho/do/projeto/vendor/namespace/package
+#     $ ../../../vendor/bin/phpunit .
+#
+# Este script é um atalho para este comando, permitindo que os testes
+# sejam executados apenas através do comando:
+#
+#     Ex:
+#     $ cd /caminho/do/projeto/vendor/namespace/package
+#     $ ./phpunit
+
+# https://laravel.com/docs/5.6/testing#environment
+php ../../../artisan config:clear
+
+if [ $# -gt 0 ]; then
+    echo "Testando $1";
+    ../../../vendor/bin/phpunit $1
+else
+    ../../../vendor/bin/phpunit .
+fi

@@ -14,8 +14,6 @@ class ObfuscateAppCommand extends BaseCommand
         '.env',
     ];
 
-
-
     /**
      * The name and signature of the console command.
      *
@@ -30,6 +28,11 @@ class ObfuscateAppCommand extends BaseCommand
      * @var string
      */
     protected $description = 'Ofusca o código PHP contido em uma aplicação Laravel para ser distribuido sem possibilitar sua leitura';
+
+    protected function getBasePath()
+    {
+        return base_path();
+    }
 
     /**
      * Execute the console command.
