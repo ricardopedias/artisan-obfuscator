@@ -1,8 +1,12 @@
 <?php
 
-    function procedure_mixed_one()
+    /**
+     * Procedural: Código misto PHP + HTML
+     * @return string
+     */
+    function PhpProceduralMixedOne()
     {
-        return "Teste de retorno um";
+        return __FUNCTION__ . " executando com sucesso";
     }
 
 ?><!doctype html>
@@ -18,9 +22,9 @@
              * Comentário da função
              * @return string
              */
-            function procedure_mixed_two()
+            function PhpProceduralMixedTwo()
             {
-                return "Teste de retorno dois";
+                return __FUNCTION__ . " executando com sucesso";
             }
 
         ?>
@@ -28,13 +32,13 @@
         <h1>Teste de ofuscação <?= 'composta' ?></h1>
 
         <p>
-            <?= procedure_mixed_one() ?>
+            <?= PhpProceduralMixedOne() ?>
         </p>
 
         <br><br><br>
 
         <p>
-            <?= procedure_mixed_two() ?>
+            <?= PhpProceduralMixedTwo() ?>
         </p>
 
     </body>

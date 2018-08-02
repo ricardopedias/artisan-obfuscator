@@ -1,8 +1,12 @@
 <?php
 
-    function procedure_closed()
+    /**
+     * Procedural: Abertura + Fachamento
+     * @return string
+     */
+    function PhpProceduralClosed()
     {
-        return "Teste de retorno";
+        return __FUNCTION__ . " executando com sucesso";
     }
 
 ?>

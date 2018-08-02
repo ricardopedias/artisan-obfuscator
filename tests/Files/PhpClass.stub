@@ -1,9 +1,12 @@
 <?php
 
-class PlainClass
+/**
+ * Class: Abertura Apenas
+ */
+class PhpClass
 {
     public function method()
     {
-        return "PlainClass executando com sucesso";
+        return __CLASS__ . " executando com sucesso";
     }
 }

@@ -1,14 +1,13 @@
 <?php
+namespace Php\Name\Space;
 
 /**
- * Class: Abertura + Fechamento
+ * Class: Abertura + Namespace
  */
-class PhpClassClosed
+class PhpClassNamespaced
 {
     public function method()
     {
         return __CLASS__ . " executando com sucesso";
     }
 }
-
-?>

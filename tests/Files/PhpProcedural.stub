@@ -1,6 +1,10 @@
 <?php
 
-    function procedure()
+    /**
+     * Procedural: Abertura
+     * @return string
+     */
+    function PhpProcedural()
     {
-        return "Teste de retorno";
+        return __FUNCTION__ . " executando com sucesso";
     }
