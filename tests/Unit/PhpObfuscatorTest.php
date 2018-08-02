@@ -3,22 +3,29 @@ namespace Obfuscator\Tests\Unit;
 
 use Tests\TestCase;
 use Obfuscator\Tests\Libs\PhpObfuscatorAccessor;
+use Obfuscator\Libs\PhpObfuscator;
 
 class PhpObfuscatorTest extends TestCase
 {
-    public function getTempFile()
+    public static function getTempFile()
     {
         return tempnam(sys_get_temp_dir(), 'obfuscating_') . ".php";
     }
 
-    public function getTestFile($filename)
+    public static function getTestFile($filename)
     {
-        return implode(DIRECTORY_SEPARATOR, [dirname(__DIR__), 'Files', $filename]);
+        $stub_file = implode(DIRECTORY_SEPARATOR, [dirname(__DIR__), 'Files', $filename]);
+        $stub_contents = file_get_contents($stub_file);
+
+        $temp_file = tempnam(sys_get_temp_dir(), 'obfuscating_class_') . ".php";
+        file_put_contents($temp_file, $stub_contents);
+
+        return $temp_file;
     }
 
-    public function getTestFileContents($filename)
+    public static function getTestFileContents($filename)
     {
-        return file_get_contents($this->getTestFile($filename));
+        return file_get_contents(self::getTestFile($filename));
     }
 
     public function testPhpWrapperRemove()
@@ -26,7 +33,7 @@ class PhpObfuscatorTest extends TestCase
         // ---------------------------------------------------------------------
         // Class: Abertura Apenas
         //
-        $code = $this->getTestFileContents('PhpClass.php');
+        $code = self::getTestFileContents('PhpClass.stub');
         $this->assertContains('<?php', $code);
         $this->assertNotContains('?>', $code);
 
@@ -37,7 +44,7 @@ class PhpObfuscatorTest extends TestCase
         // ---------------------------------------------------------------------
         // Class: Abertura + Fechamento
         //
-        $code = $this->getTestFileContents('PhpClassClosed.php');
+        $code = self::getTestFileContents('PhpClassClosed.stub');
         $this->assertContains('<?php', $code);
         $this->assertContains('?>', $code);
 
@@ -48,7 +55,7 @@ class PhpObfuscatorTest extends TestCase
         // ---------------------------------------------------------------------
         // Procedural: Abertura
         //
-        $code = $this->getTestFileContents('PhpProcedural.php');
+        $code = self::getTestFileContents('PhpProcedural.stub');
         $this->assertContains('<?php', $code);
         $this->assertNotContains('?>', $code);
 
@@ -59,7 +66,7 @@ class PhpObfuscatorTest extends TestCase
         // ---------------------------------------------------------------------
         // Procedural: Abertura + Fechamento
         //
-        $code = $this->getTestFileContents('PhpProceduralClosed.php');
+        $code = self::getTestFileContents('PhpProceduralClosed.stub');
         $this->assertContains('<?php', $code);
         $this->assertContains('?>', $code);
 
@@ -70,7 +77,7 @@ class PhpObfuscatorTest extends TestCase
         // ---------------------------------------------------------------------
         // Procedural: Abertura + Fechamento + Mixeds
         //
-        $code = $this->getTestFileContents('PhpProceduralMixed.php');
+        $code = self::getTestFileContents('PhpProceduralMixed.stub');
 
         $this->assertContains('<?php', $code);
         $this->assertContains('<?=', $code);
@@ -80,4 +87,24 @@ class PhpObfuscatorTest extends TestCase
         $this->assertFalse($removed);
     }
 
+    public function testObfuscate()
+    {
+        $origin = self::getTestFile('PhpClass.stub');
+        $saved_file = self::getTempFile();
+
+        $ob = (new PhpObfuscator)->obfuscateFile($origin);
+        $this->assertTrue($ob->save($saved_file));
+
+        // dd(file_get_contents($saved_file));
+
+        $contents = $ob->getObfuscated();
+
+        require_once $saved_file;
+
+        // Executa a classe ofuscada
+        $this->assertEquals((new \PlainClass)->method(), 'PlainClass executando com sucesso');
+
+        // TODO: implementar de outra forma o wrapCode sem incluir o arquivo RevertObfuscation
+        // para que seja possível testar arquivos sem as funções de reversão
+    }
 }

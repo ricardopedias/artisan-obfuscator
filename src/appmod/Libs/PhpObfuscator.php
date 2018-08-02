@@ -17,13 +17,28 @@ namespace Obfuscator\Libs;
  */
 class PhpObfuscator
 {
-    private $obfuscated = '';
+    private $decode_errors = true;
 
-    private $encode_errors = [];
+    private $obfuscated    = '';
 
-    private $decode_errors = [];
+    private $errors = [];
 
-    private $enable_decode_errors = true;
+    private $function_name = null;
+
+    private $key_name      = null;
+
+    /**
+     * Habilita a liberação de erros de dentro do
+     * código já ofuscado
+     *
+     * @param  boolean $enable
+     * @return \Obfuscator\Libs\PhpObfuscator
+     */
+    public function enableDecodeErrors($enable = true)
+    {
+        $this->decode_errors = $enable;
+        return $this;
+    }
 
     /**
      * Ofusca o arquivo especificado.
@@ -43,11 +58,66 @@ class PhpObfuscator
         $this->obfuscated = $this->obfuscateString($contents);
 
         if ($this->obfuscated == false) {
-            $this->encode_errors[] = 'Código misto encontrado. Arquivo não ofuscado.';
+            $this->errors[] = 'Código misto encontrado. Arquivo não ofuscado.';
             $this->obfuscated = $contents;
         }
 
         return $this;
+    }
+
+    /**
+     * Devolve o nome de uma função para descompressão de código.
+     * As funções se encontram no arquivo RevertObfuscation e servem
+     * para converter/desconverter uma string com código php.
+     *
+     * @return string
+     */
+    private function getDynamicFunctionName()
+    {
+        if ($this->function_name != null) {
+            // Lazyload paa devolver apenas um nome por instância
+            return $this->function_name;
+        }
+
+        $functions = [
+            'cfForgetShow',
+            'cryptOf',
+            'unsetZeros',
+            'deflatingNow',
+            'zeroizeCipher',
+            'iqutZ',
+            'sagaPlus'
+        ];
+
+        $this->function_name = $functions[array_rand($functions)];
+        return $this->function_name;
+    }
+
+    /**
+     * Devolve o nome de uma função para setagem de parametros
+     * nas funções aleatórias do método getDynamicFunctionName().
+     * As funções se encontram no arquivo RevertObfuscation e servem
+     * para dificultar um pouco o entendimento do hacker.
+     *
+     * @return string
+     */
+    private function getDynamicKeyName()
+    {
+        if ($this->key_name != null) {
+            // Lazyload paa devolver apenas um nome por instância
+            return $this->key_name;
+        }
+
+        $keys = [
+            'decompressMD5',
+            'unsetLogger',
+            'loopNested',
+            'vorticeData',
+            'cipherBinary'
+        ];
+
+        $this->key_name = $keys[array_rand($keys)];
+        return $this->key_name;
     }
 
     /**
@@ -65,9 +135,7 @@ class PhpObfuscator
             return false;
         }
 
-        $encoded = $this->encodeString($code, 1);
-
-        return $this->phpWrapperAdd($encoded);
+        return $this->wrapCode($plain_code);
     }
 
     /**
@@ -90,6 +158,29 @@ class PhpObfuscator
     }
 
     /**
+     * Embrulha o código num container de ofuscação.
+     *
+     * @param  string $code
+     * @return string
+     */
+    public function wrapCode(string $code)
+    {
+        $prefix = ($this->decode_errors == false) ? '' : '@';
+
+        $function_call = $this->getDynamicFunctionName();
+        $keyname_call  = $this->getDynamicKeyName();
+
+        require_once(__DIR__ . DIRECTORY_SEPARATOR . 'RevertObfuscation.stub');
+
+        $string = '';
+        $string.= $this->toASCII($prefix. "eval({$function_call}("); // esconde a função descompactar
+        $string.= "'" . $function_call($code) . "'";                 // executa a função compactar
+        $string.= $this->toASCII(",{$keyname_call}())); ");
+
+        return $this->phpWrapperAdd($string);
+    }
+
+    /**
      * Adiciona os invólucros do PHP.
      *
      * @param  string $code
@@ -97,155 +188,11 @@ class PhpObfuscator
      */
     protected function phpWrapperAdd(string $code) : string
     {
-        return "<?php\n {$code}";
-    }
-
-    protected function encodedWrapperAdd($code) : string
-    {
-        return "eval(\"{$code}\");";
-    }
-
-    private function getDynamicFunctionName()
-    {
-        $functions = [
-            'cfForgetShow',
-            'cryptOf',
-            'unsetZeros',
-            'deflatingNow',
-            'zeroizeCipher',
-            'iqutZ',
-            'sagaPlus'
-        ];
-
-        return $functions[array_rand($functions)];
-    }
-
-    private function getDynamicKeyName()
-    {
-        $keys = [
-            'decompressMD5',
-            'unsetLogger',
-            'loopNested',
-            'vorticeData',
-            'cipherBinary'
-        ];
-
-        return $keys[array_rand($keys)];
+        return "<?php\n eval(\"{$code}\");";
     }
 
     /**
-     * Salva o código ofuscado no destino especificado.
-     *
-     * @param  string $destiny
-     * @return \Obfuscator\Libs\PhpObfuscator
-     */
-    public function save($destiny)
-    {
-        file_put_contents($destiny, $this->obfuscated);
-        return $this;
-    }
-
-
-    public function getObfuscated()
-    {
-        return $this->obfuscated;
-    }
-
-    public function enableDecodeErrors($enable = true)
-    {
-        $this->enable_decode_errors = $enable;
-    }
-
-
-    public function encodeString($code)
-    {
-        $prefix = '';
-        if ($this->enable_decode_errors == false) {
-            $prefix = '@';
-        }
-
-        // Máximo de 3 levels
-        $levels = $levels>3 ? 3 : $levels;
-
-        $functionsCalled = array();
-        for($x=0; $x < $levels; $x++) {
-
-            $functionName = $this->getDynamicFunctionName();
-            $functionsCalled[] = $functionName;
-            $code = $functionName($code);
-        }
-
-        if ($levels == 1) {
-
-            $functionName = $functionsCalled[0];
-            $keyName = $this->getDynamicKeyName();
-
-            $str = '';
-            $str.= $this->toASCII($prefix. "eval({$functionName}(");
-            $str.= "'" . $code . "'";
-            $str.= $this->toASCII(",{$keyName}())); ");
-
-        }
-        elseif ($levels == 2) {
-
-            $functionOne = $functionsCalled[1];
-            $keyName = $this->getDynamicKeyName();
-
-            $oneStr = "";
-            $oneStr.= $this->toASCII("{$functionOne}(");
-            $oneStr.= "'" . $code . "'";
-            $oneStr.= $this->toASCII(",{$keyName}()) ");
-
-            $functionTwo = $functionsCalled[0];
-            $keyName = $this->getDynamicKeyName();
-
-            $str = "";
-            $str.= $this->toASCII($prefix. "eval({$functionTwo}(");
-            $str.= $oneStr;
-            $str.= $this->toASCII(",{$keyName}())); ");
-
-        }
-
-        elseif ($levels == 3) {
-
-            $functionOne = $functionsCalled[2];
-            $keyName = $this->getDynamicKeyName();
-
-            $oneStr = "";
-            $oneStr.= $this->toASCII("{$functionOne}(");
-            $oneStr.= "'" . $code . "'";
-            $oneStr.= $this->toASCII(",{$keyName}()) ");
-
-            $functionTwo = $functionsCalled[1];
-            $keyName = $this->getDynamicKeyName();
-
-            $twoStr = "";
-            $twoStr.= $this->toASCII("{$functionTwo}(");
-            $twoStr.= $oneStr;
-            $twoStr.= $this->toASCII(",{$keyName}()) ");
-
-            $functionThree = $functionsCalled[0];
-            $keyName = $this->getDynamicKeyName();
-
-            $str = "";
-            $str.= $this->toASCII($prefix. "eval({$functionThree}(");
-            $str.= $twoStr;
-            $str.= $this->toASCII(",{$keyName}())); ");
-
-        }
-
-        /*
-        $host = $this->getHost();
-        $str = str2ASCII("if(obfhost()==\"{$host}\"){ @eval(obfinflate(\" ");
-        $str.= $encoded;
-        $str.= str2ASCII(" \",obfcode())); }");
-        */
-
-        return $str;
-    }
-
-    /**
-     * Transforma a string em código ASCII hexadecimal.
+     * Transforma a string em código hexadecimal ASCII.
      *
      * @param string $string
      * @return string
@@ -258,6 +205,34 @@ class PhpObfuscator
         }
         return $ascii;
     }
+
+    /**
+     * Devolve o código resultante do processo de ofuscação.
+     *
+     * @return string
+     */
+    public function getObfuscated()
+    {
+        return $this->obfuscated;
+    }
+
+    /**
+     * Salva o código ofuscado no destino especificado.
+     *
+     * @param  string $destiny
+     * @return bool
+     */
+    public function save($destiny)
+    {
+        return (file_put_contents($destiny, $this->getObfuscated()) !== false);
+    }
+
+
+
+
+
+
+
 
 
     private function encode__($code, $levels = 1, $host = NULL)
