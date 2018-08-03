@@ -25,12 +25,9 @@ class PhpObfuscatorAccessor extends PhpObfuscator
         return $this->encodedWrapperAdd($code);
     }
 
-    public function accessGenerateRevertFile()
-    {
-        return $this->generateRevertFile();
-    }
-
+    //
     // Funções ramdomicas
+    //
 
     public function accessGetPackerName()
     {
@@ -47,6 +44,14 @@ class PhpObfuscatorAccessor extends PhpObfuscator
         return $this->getArgumenterName();
     }
 
+    //
+    // Geração do arquivo de ofuscação
+    //
+
+    public function accessGetRevertFileContents()
+    {
+        return $this->getRevertFileContents();
+    }
 
 
 }

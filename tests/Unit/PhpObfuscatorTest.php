@@ -62,12 +62,6 @@ class PhpObfuscatorTest extends TestCase
         $this->assertFalse($removed);
     }
 
-    public function testGenerateRevertFile()
-    {
-        //$file = (new PhpObfuscatorAccessor)->accessGenerateRevertFile();
-        $this->assertTrue(true);
-    }
-
     //
     // Funções aleatórias
     //
@@ -193,12 +187,16 @@ class PhpObfuscatorTest extends TestCase
         \PhpProceduralClosed();
     }
 
+    public function testGetRevertFileContents()
+    {
+        $ob = (new PhpObfuscatorAccessor)->accessGetRevertFileContents();
+        $this->assertTrue(true);
+    }
+
+
+
     public function testObfuscate()
     {
-
-        // Inclusão do arquivo com as funções de reversão
-        // para que a ofuscação possa ser desfeita
-
         foreach ([
             'PhpClass.stub',
             'PhpClassClosed.stub',
@@ -209,10 +207,17 @@ class PhpObfuscatorTest extends TestCase
 
             $origin = self::getTestFile($file);
             $saved_file = self::getTempFile();
+            $saved_revert_file = self::getTempFile();
 
             // Ofusca o arquivo e salva do disco
             $ob = (new PhpObfuscator)->obfuscateFile($origin);
             $this->assertTrue($ob->save($saved_file));
+            $this->assertTrue($ob->saveRevertFile($saved_revert_file));
+
+            dd(file_get_contents($saved_revert_file));
+
+            // Inclusão do arquivo com as funções de reversão
+            require_once $saved_revert_file;
 
             // Inclusão do arquivo ofuscado
             require_once $saved_file;

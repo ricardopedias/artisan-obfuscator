@@ -109,18 +109,6 @@ class PhpObfuscator
         return $this->argumenter_function ;
     }
 
-
-    /**
-     * Seta a localização do arquivo que será usado para reversão.
-     * Este arquivo deverá ser incluído para que a reversão possa acontecer.
-     *
-     * @param [type] $filename [description]
-     */
-    public function setRevertFilename($filename)
-    {
-
-    }
-
     /**
      * Ofusca o arquivo especificado.
      *
@@ -146,14 +134,10 @@ class PhpObfuscator
         return $this;
     }
 
-
-
     /**
      * Ofusca o código espeficicado.
      *
      * @param  string  $php_code
-     * @param  integer $levels   [description]
-     * @param  [type]  $host     [description]
      * @return string
      */
     public function obfuscateString(string $php_code)
@@ -201,7 +185,7 @@ class PhpObfuscator
 
         $string = '';
         $string.= $this->toASCII($prefix. "eval({$unpacker_function}("); // esconde a função descompactar
-        $string.= "'" . $this->{$packer_method}($code) . "'";            // executa a função compactar
+        $string.= "'" . $this->{$packer_method . "Pack"}($code) . "'";            // executa a função compactar
         $string.= $this->toASCII(",{$argumenter}())); ");
 
         return $this->phpWrapperAdd($string);
@@ -256,30 +240,68 @@ class PhpObfuscator
         return (file_put_contents($destiny, $this->getObfuscated()) !== false);
     }
 
-
-    protected function generateRevertFile()
+    /**
+     * Salva as funções responsáveis pela reversão da ofuscação.
+     *
+     * @param  string $destiny
+     * @return bool
+     */
+    public function saveRevertFile($destiny)
     {
-        $base_one = $this->extractMethod('breakOne', 'baseOne');
-        dd($base_one);
+        return (file_put_contents($destiny, $this->getRevertFileContents(false)) !== false);
     }
 
-
-
-    protected function createInflateFunction($function_name)
+    /**
+     * Gera o conteúdo do arquivo com as funções de reversão.
+     *
+     * @param  boolean $obfuscate
+     * @return string
+     */
+    protected function getRevertFileContents($obfuscate = true)
     {
-        $unbreak_name = $this->inflate_functions[$function_name];
 
-        return "function {$function_name}(\$data, \$revert = false){ "
-             . "return baseThree(\$data, \$revert); "
-             . "}";
+        $lines = [];
+
+        $sp = "    ";
+
+        // Cria os desempacotadores falsos.
+        // As chaves e valores são no formato 'função_falsa => metodo'.
+        // Ex.:
+        // [
+        //     'cfForgetShow'  => 'breakOne',
+        //     'cryptOf'       => 'breakTwo',
+        //     ...
+        // ]
+        foreach($this->map_packer_functions as $fake_name => $method_name) {
+
+            // Transforma o nome do metodo 'breakOne' para a função 'baseOne'
+            $base_name = str_replace('break', 'base', $method_name);
+
+            $lines[] = $sp . "function {$fake_name}(\$data, \$revert = false){\n"
+                     . $sp .$sp . "return {$base_name}(\$data);\n"
+                     . $sp . "}\n";
+        }
+
+        $bases = array_unique($this->map_packer_functions);
+        foreach($bases as $method_name) {
+
+            // Transforma o nome do metodo 'breakOne' para a função 'baseOne'
+            $base_name = str_replace('break', 'base', $method_name);
+
+            $lines[] = $sp . "function {$base_name}(\$data)\n"
+                     . $this->extractMethod('breakOneUnpack');
+        }
+
+        foreach($this->map_argumenter_functions as $method_name) {
+            $lines[] = $sp . "function {$method_name}() { return TRUE; }\n";
+        }
+
+        $contents = "<?php\n" . implode("\n", $lines);
+
+        return ($obfuscate == true) ? $this->obfuscateString($contents) : $contents;
     }
 
-    protected function createKeyFunction($function_name)
-    {
-        return "function {$function_name}(){ return true; }";
-    }
-
-    private function extractMethod($method_name, $function_name)
+    private function extractMethod($method_name)
     {
         $method = new \ReflectionMethod(__CLASS__, $method_name);
         $start_line = $method->getStartLine(); // it's actually - 1, otherwise you wont get the function() block
@@ -287,8 +309,7 @@ class PhpObfuscator
         $length = $end_line - $start_line;
 
         $source = file(__FILE__);
-        return $function_name . "(\$data, \$revert = false)"
-            . implode("", array_slice($source, $start_line, $length));
+        return implode("", array_slice($source, $start_line, $length));
     }
 
     //
@@ -297,74 +318,84 @@ class PhpObfuscator
     // para que a ofuscação possa ser desfeita
     //
 
-    public function breakOne($data, $revert = false)
+    public function breakOnePack($data)
     {
-        if ($revert == false) {
+        $encoded = base64_encode($data);
 
-            $encoded = base64_encode($data);
+        // Separa em dois pedaços
+        $partOne = mb_substr($encoded, 0, 10, "utf-8");
+        $partTwo = mb_substr($encoded, 10, null, "utf-8");
 
-            // Separa em dois pedaços
-            $partOne = mb_substr($encoded, 0, 10, "utf-8");
-            $partTwo = mb_substr($encoded, 10, null, "utf-8");
+        // Insere 'Sg' para invalidar o base64
+        return $partOne . 'Sg' . $partTwo;
+    }
 
-            // Insere 'Sg' para invalidar o base64
-            return $partOne . 'Sg' . $partTwo;
-        }
-
+    /**
+     * Remove 'Sg' para validar o base64
+     *
+     * @param  string  $data
+     * @param  boolean $revert
+     * @return string
+     */
+    public function breakOneUnpack($data, $revert = false)
+    {
         // Separa em dois pedaços
         $partOne = mb_substr($data, 0, 10, "utf-8");
         $partTwo = mb_substr($data, 12, null, "utf-8");
-
-        // Remove 'Sg' para validar o base64
         return base64_decode($partOne . $partTwo);
     }
 
-    public function breakTwo($data, $revert = false)
+    public function breakTwoPack($data)
     {
-        if ($revert == false) {
+        $encoded = base64_encode($data);
 
-            $encoded = base64_encode($data);
+        // Separa em dois pedaços
+        $partOne = mb_substr($encoded, 0, 5, "utf-8");
+        $partTwo = mb_substr($encoded, 5, null, "utf-8");
 
-            // Separa em dois pedaços
-            $partOne = mb_substr($encoded, 0, 5, "utf-8");
-            $partTwo = mb_substr($encoded, 5, null, "utf-8");
+        // Insere 'Sg' para invalidar o base64
+        return $partOne . 'Sg' . $partTwo;
+    }
 
-            // Insere 'Sg' para invalidar o base64
-            return $partOne . 'Sg' . $partTwo;
-        }
-
+    /**
+     * Remove 'Sg' para validar o base64
+     *
+     * @param  string  $data
+     * @param  boolean $revert
+     * @return string
+     */
+    public function breakTwoUnpack($data, $revert = false)
+    {
         // Separa em dois pedaços
         $partOne = mb_substr($data, 0, 5, "utf-8");
         $partTwo = mb_substr($data, 7, null, "utf-8");
-
-        // Remove 'Sg' para validar o base64
         return base64_decode($partOne . $partTwo);
     }
 
-    public function breakThree($data, $revert = false)
+    public function breakThreePack($data)
     {
-        if ($revert == false) {
+        $encoded = base64_encode($data);
 
-            $encoded = base64_encode($data);
+        // Separa em dois pedaços
+        $partOne = mb_substr($encoded, 0, 15, "utf-8");
+        $partTwo = mb_substr($encoded, 15, null, "utf-8");
 
-            // Separa em dois pedaços
-            $partOne = mb_substr($encoded, 0, 15, "utf-8");
-            $partTwo = mb_substr($encoded, 15, null, "utf-8");
+        // Insere 'Sg' para invalidar o base64
+        return $partOne . 'Sg' . $partTwo;
+    }
 
-            // Insere 'Sg' para invalidar o base64
-            return $partOne . 'Sg' . $partTwo;
-        }
-
+    /**
+     * Remove 'Sg' para validar o base64
+     *
+     * @param  string  $data
+     * @param  boolean $revert
+     * @return string
+     */
+    public function breakThreeUnpack($data, $revert = false)
+    {
         // Separa em dois pedaços
         $partOne = mb_substr($data, 0, 15, "utf-8");
         $partTwo = mb_substr($data, 17, null, "utf-8");
-
-        // Remove 'Sg' para validar o base64
         return base64_decode($partOne . $partTwo);
     }
-
-
-
-
-
 }
