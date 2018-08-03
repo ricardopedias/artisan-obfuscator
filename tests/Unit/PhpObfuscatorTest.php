@@ -9,32 +9,6 @@ class PhpObfuscatorTest extends TestCase
 {
     private $errors;
 
-    protected function setUp()
-    {
-        $this->errors = array();
-        set_error_handler(array($this, "errorHandler"));
-    }
-
-    public function errorHandler($errno, $errstr, $errfile, $errline, $errcontext)
-    {
-        $this->errors[] = compact("errno", "errstr", "errfile",
-            "errline", "errcontext");
-    }
-
-    public function assertError($errstr, $errno)
-    {
-        foreach ($this->errors as $error) {
-            if ($error["errstr"] === $errstr
-                && $error["errno"] === $errno) {
-                return;
-            }
-        }
-
-        $this->fail("Error with level " . $errno .
-            " and message '" . $errstr . "' not found in ",
-            var_export($this->errors, TRUE));
-    }
-
     public static function getTempFile()
     {
         return tempnam(sys_get_temp_dir(), 'obfuscating_') . ".php";
@@ -87,6 +61,47 @@ class PhpObfuscatorTest extends TestCase
         $removed = (new PhpObfuscatorAccessor)->accessPhpWrapperRemove($code);
         $this->assertFalse($removed);
     }
+
+    public function testGenerateRevertFile()
+    {
+        //$file = (new PhpObfuscatorAccessor)->accessGenerateRevertFile();
+        $this->assertTrue(true);
+    }
+
+    //
+    // Funções aleatórias
+    //
+
+    public function testGetPackerName()
+    {
+        $ob = new PhpObfuscatorAccessor;
+        // $list = $ob->getProperty('map_packer_functions');
+        $name_one = $ob->accessGetPackerName();
+        $name_two = $ob->accessGetPackerName();
+        $this->assertEquals($name_one, $name_two);
+    }
+
+    public function testGetPackerMethodName()
+    {
+        $ob = new PhpObfuscatorAccessor;
+        // $list = $ob->getProperty('map_packer_functions');
+        $name_one = $ob->accessGetPackerMethodName();
+        $name_two = $ob->accessGetPackerMethodName();
+        $this->assertEquals($name_one, $name_two);
+    }
+
+    public function testGetArgumenterName()
+    {
+        $ob = new PhpObfuscatorAccessor;
+        // $list = $ob->getProperty('map_argumenter_functions');
+        $name_one = $ob->accessGetArgumenterName();
+        $name_two = $ob->accessGetArgumenterName();
+        $this->assertEquals($name_one, $name_two);
+    }
+
+    //
+    // Ofuscação e Execução
+    //
 
      /**
       * @expectedException Error

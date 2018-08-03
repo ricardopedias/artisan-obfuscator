@@ -21,11 +21,29 @@ class PhpObfuscator
 
     private $obfuscated    = '';
 
-    private $errors = [];
+    private $errors        = [];
 
-    private $function_name = null;
+    private $packer_function  = null;
 
-    private $key_name      = null;
+    private $argumenter_function       = null;
+
+    protected $map_packer_functions = [
+        'cfForgetShow'  => 'breakOne',
+        'cryptOf'       => 'breakTwo',
+        'unsetZeros'    => 'breakOne',
+        'deflatingNow'  => 'breakTwo',
+        'zeroizeCipher' => 'breakThree',
+        'iqutZ'         => 'breakTwo',
+        'sagaPlus'      => 'breakThree',
+    ];
+
+    protected $map_argumenter_functions = [
+        'decompressMD5',
+        'unsetLogger',
+        'loopNested',
+        'vorticeData',
+        'cipherBinary'
+    ];
 
     /**
      * Habilita a liberação de erros de dentro do
@@ -38,6 +56,69 @@ class PhpObfuscator
     {
         $this->decode_errors = $enable;
         return $this;
+    }
+
+    /**
+     * Devolve o nome do 'empacotador' que, internamente,
+     * será responsável pela compressão/descompressão do código.
+     *
+     * @return string
+     */
+    protected function getPackerName()
+    {
+        if ($this->packer_function != null) {
+            // Lazyload paa devolver apenas um nome por instância
+            return $this->packer_function;
+        }
+
+        $list = array_keys($this->map_packer_functions);
+        $this->packer_function = $list[array_rand($list)];
+        return $this->packer_function;
+    }
+
+    /**
+     * Devolve o nome do método que será copiado para dentro
+     * do 'empacotador' que, internamente, será responsável pela
+     * compressão/descompressão do código.
+     *
+     * @return string
+     */
+    protected function getPackerMethodName()
+    {
+        $fake_name = $this->getPackerName();
+        return $this->map_packer_functions[$fake_name];
+    }
+
+    /**
+     * Devolve o nome da função falsa que será usada como argumento do
+     * 'empacotador' no momento da descompressão do código.
+     * Trata-se de uma função que sempre retorna 'true',
+     * apenas com nomes ramdomicamente diferentes.
+     *
+     * @return string
+     */
+    protected function getArgumenterName()
+    {
+        if ($this->argumenter_function  != null) {
+            // Lazyload paa devolver apenas um nome por instância
+            return $this->argumenter_function ;
+        }
+
+        $keys = $this->map_argumenter_functions;
+        $this->argumenter_function  = $keys[array_rand($keys)];
+        return $this->argumenter_function ;
+    }
+
+
+    /**
+     * Seta a localização do arquivo que será usado para reversão.
+     * Este arquivo deverá ser incluído para que a reversão possa acontecer.
+     *
+     * @param [type] $filename [description]
+     */
+    public function setRevertFilename($filename)
+    {
+
     }
 
     /**
@@ -65,60 +146,7 @@ class PhpObfuscator
         return $this;
     }
 
-    /**
-     * Devolve o nome de uma função para descompressão de código.
-     * As funções se encontram no arquivo RevertObfuscation e servem
-     * para converter/desconverter uma string com código php.
-     *
-     * @return string
-     */
-    private function getDynamicFunctionName()
-    {
-        if ($this->function_name != null) {
-            // Lazyload paa devolver apenas um nome por instância
-            return $this->function_name;
-        }
 
-        $functions = [
-            'cfForgetShow',
-            'cryptOf',
-            'unsetZeros',
-            'deflatingNow',
-            'zeroizeCipher',
-            'iqutZ',
-            'sagaPlus'
-        ];
-
-        $this->function_name = $functions[array_rand($functions)];
-        return $this->function_name;
-    }
-
-    /**
-     * Devolve o nome de uma função para setagem de parametros
-     * nas funções aleatórias do método getDynamicFunctionName().
-     * As funções se encontram no arquivo RevertObfuscation e servem
-     * para dificultar um pouco o entendimento do hacker.
-     *
-     * @return string
-     */
-    private function getDynamicKeyName()
-    {
-        if ($this->key_name != null) {
-            // Lazyload paa devolver apenas um nome por instância
-            return $this->key_name;
-        }
-
-        $keys = [
-            'decompressMD5',
-            'unsetLogger',
-            'loopNested',
-            'vorticeData',
-            'cipherBinary'
-        ];
-
-        $this->key_name = $keys[array_rand($keys)];
-        return $this->key_name;
-    }
 
     /**
      * Ofusca o código espeficicado.
@@ -167,15 +195,14 @@ class PhpObfuscator
     {
         $prefix = ($this->decode_errors == false) ? '' : '@';
 
-        $function_call = $this->getDynamicFunctionName();
-        $keyname_call  = $this->getDynamicKeyName();
-
-        require_once(__DIR__ . DIRECTORY_SEPARATOR . 'RevertObfuscation.stub');
+        $packer_method = $this->getPackerMethodName();
+        $unpacker_function = $this->getPackerName();
+        $argumenter  = $this->getArgumenterName();
 
         $string = '';
-        $string.= $this->toASCII($prefix. "eval({$function_call}("); // esconde a função descompactar
-        $string.= "'" . $function_call($code) . "'";                 // executa a função compactar
-        $string.= $this->toASCII(",{$keyname_call}())); ");
+        $string.= $this->toASCII($prefix. "eval({$unpacker_function}("); // esconde a função descompactar
+        $string.= "'" . $this->{$packer_method}($code) . "'";            // executa a função compactar
+        $string.= $this->toASCII(",{$argumenter}())); ");
 
         return $this->phpWrapperAdd($string);
     }
@@ -200,9 +227,11 @@ class PhpObfuscator
     private function toASCII($string)
     {
         $ascii = "";
+
         for ($i = 0; $i < strlen($string); $i ++) {
             $ascii .= '\x' . bin2hex($string{$i});
         }
+
         return $ascii;
     }
 
@@ -228,317 +257,114 @@ class PhpObfuscator
     }
 
 
-
-
-
-
-
-
-
-    private function encode__($code, $levels = 1, $host = NULL)
+    protected function generateRevertFile()
     {
-        require_once('RevertObfuscation.php');
+        $base_one = $this->extractMethod('breakOne', 'baseOne');
+        dd($base_one);
+    }
 
-        $prefix = '';
-        if ($this->show_decode_errors == FALSE) {
-            $prefix = '@';
+
+
+    protected function createInflateFunction($function_name)
+    {
+        $unbreak_name = $this->inflate_functions[$function_name];
+
+        return "function {$function_name}(\$data, \$revert = false){ "
+             . "return baseThree(\$data, \$revert); "
+             . "}";
+    }
+
+    protected function createKeyFunction($function_name)
+    {
+        return "function {$function_name}(){ return true; }";
+    }
+
+    private function extractMethod($method_name, $function_name)
+    {
+        $method = new \ReflectionMethod(__CLASS__, $method_name);
+        $start_line = $method->getStartLine(); // it's actually - 1, otherwise you wont get the function() block
+        $end_line = $method->getEndLine();
+        $length = $end_line - $start_line;
+
+        $source = file(__FILE__);
+        return $function_name . "(\$data, \$revert = false)"
+            . implode("", array_slice($source, $start_line, $length));
+    }
+
+    //
+    // Métodos para compactação e descompactação de código
+    // Estes métodos são adicionados automaticamente nas rotinas
+    // para que a ofuscação possa ser desfeita
+    //
+
+    public function breakOne($data, $revert = false)
+    {
+        if ($revert == false) {
+
+            $encoded = base64_encode($data);
+
+            // Separa em dois pedaços
+            $partOne = mb_substr($encoded, 0, 10, "utf-8");
+            $partTwo = mb_substr($encoded, 10, null, "utf-8");
+
+            // Insere 'Sg' para invalidar o base64
+            return $partOne . 'Sg' . $partTwo;
         }
 
-        // Máximo de 3 levels
-        $levels = $levels>3 ? 3 : $levels;
+        // Separa em dois pedaços
+        $partOne = mb_substr($data, 0, 10, "utf-8");
+        $partTwo = mb_substr($data, 12, null, "utf-8");
 
-        $functions_called = array();
-        for($x=0; $x < $levels; $x++) {
+        // Remove 'Sg' para validar o base64
+        return base64_decode($partOne . $partTwo);
+    }
 
-            $function_name = $this->getDynamicFunctionName();
-            $functions_called[] = $function_name;
-            $code = $function_name($code);
+    public function breakTwo($data, $revert = false)
+    {
+        if ($revert == false) {
+
+            $encoded = base64_encode($data);
+
+            // Separa em dois pedaços
+            $partOne = mb_substr($encoded, 0, 5, "utf-8");
+            $partTwo = mb_substr($encoded, 5, null, "utf-8");
+
+            // Insere 'Sg' para invalidar o base64
+            return $partOne . 'Sg' . $partTwo;
         }
 
-        if ($levels == 1) {
+        // Separa em dois pedaços
+        $partOne = mb_substr($data, 0, 5, "utf-8");
+        $partTwo = mb_substr($data, 7, null, "utf-8");
 
-            $function_name = $functions_called[0];
-            $key_name = $this->getDynamicKeyName();
+        // Remove 'Sg' para validar o base64
+        return base64_decode($partOne . $partTwo);
+    }
 
-            $str = '';
-            $str.= $this->toASCII($prefix. "eval({$function_name}(");
-            $str.= "'" . $code . "'";
-            $str.= $this->toASCII(",{$key_name}())); ");
+    public function breakThree($data, $revert = false)
+    {
+        if ($revert == false) {
 
-        }
-        elseif ($levels == 2) {
+            $encoded = base64_encode($data);
 
-            $function_one = $functions_called[1];
-            $key_name = $this->getDynamicKeyName();
+            // Separa em dois pedaços
+            $partOne = mb_substr($encoded, 0, 15, "utf-8");
+            $partTwo = mb_substr($encoded, 15, null, "utf-8");
 
-            $oneStr = "";
-            $oneStr.= $this->toASCII("{$function_one}(");
-            $oneStr.= "'" . $code . "'";
-            $oneStr.= $this->toASCII(",{$key_name}()) ");
-
-            $function_two = $functions_called[0];
-            $key_name = $this->getDynamicKeyName();
-
-            $str = "";
-            $str.= $this->toASCII($prefix. "eval({$function_two}(");
-            $str.= $oneStr;
-            $str.= $this->toASCII(",{$key_name}())); ");
-
+            // Insere 'Sg' para invalidar o base64
+            return $partOne . 'Sg' . $partTwo;
         }
 
-        elseif ($levels == 3) {
+        // Separa em dois pedaços
+        $partOne = mb_substr($data, 0, 15, "utf-8");
+        $partTwo = mb_substr($data, 17, null, "utf-8");
 
-            $function_one = $functions_called[2];
-            $key_name = $this->getDynamicKeyName();
-
-            $oneStr = "";
-            $oneStr.= $this->toASCII("{$function_one}(");
-            $oneStr.= "'" . $code . "'";
-            $oneStr.= $this->toASCII(",{$key_name}()) ");
-
-            $function_two = $functions_called[1];
-            $key_name = $this->getDynamicKeyName();
-
-            $twoStr = "";
-            $twoStr.= $this->toASCII("{$function_two}(");
-            $twoStr.= $oneStr;
-            $twoStr.= $this->toASCII(",{$key_name}()) ");
-
-            $functionThree = $functions_called[0];
-            $key_name = $this->getDynamicKeyName();
-
-            $str = "";
-            $str.= $this->toASCII($prefix. "eval({$functionThree}(");
-            $str.= $twoStr;
-            $str.= $this->toASCII(",{$key_name}())); ");
-
-        }
-
-        /*
-        $host = $this->getHost();
-        $str = str2ASCII("if(obfhost()==\"{$host}\"){ @eval(obfinflate(\" ");
-        $str.= $encoded;
-        $str.= str2ASCII(" \",obfcode())); }");
-        */
-
-        return $str;
+        // Remove 'Sg' para validar o base64
+        return base64_decode($partOne . $partTwo);
     }
 
 
 
 
 
-
-
-
-
-    public function encodesssssssssss($filename)
-    {
-        global $obfuscate;
-
-        // Filtros a excluir
-        $obfuscateExcludes = array(
-            'vendor',
-            'Plexi/autoloader.php',
-            'Layout/Engines/Library',
-            'Assets/Compilers/Library',
-            'Admin/Assets',
-            'Ads/Assets',
-            'Banners/Assets',
-            'Install/Assets',
-            'Layouts/Assets',
-            'Login/Assets',
-            'Pages/Assets',
-            'Place/Assets',
-            'Products/Assets',
-            'Sites/Assets',
-            'Exception'
-        );
-
-        $allowable = TRUE;
-        foreach ($obfuscateExcludes as $strip) {
-            if (strpos($filename, $strip) != FALSE) {
-                $allowable = FALSE;
-                $console->showInfo("Filtro de exclusão encontrado: \"" . $strip . "\"!");
-                break;
-            }
-        }
-
-        if ($allowable == FALSE) {
-            $console->showInfo("O arquivo não será ofuscado!");
-            return FALSE;
-        }
-
-
-        // É uma aplicação?
-        if (strpos($filename, 'App')) {
-            $space = 'App';
-        }
-        elseif (strpos($filename, 'Plexi')) {
-            $space = 'Plexi';
-        }
-        else {
-            $console->showInfo("Apenas arquivos Plexi e App podem ser ofuscados!");
-            $console->showInfo("Arquivo " . $filename . " ignorado!");
-            return FALSE;
-        }
-
-        $onlyPath = str_replace('.php', '', $filename);
-
-        $parts = explode($space, $onlyPath);
-        if (isset($parts[1])) {
-
-            //$fileContent = file_get_contents($filename);
-            $fileContent = php_strip_whitespace($filename);
-
-
-            // Ignora os diretórios
-            $ignore = array(
-                'Assets'
-                );
-            $currentDir = dirname($filename);
-            foreach ($ignore as $dir) {
-                if(strpos($currentDir, $dir)) {
-                    $console->showInfo("Diretório " . $currentDir . " ignorado!");
-                    return FALSE;
-                }
-            }
-
-            // Determina se é uma classe
-            $classNameSpace = str_replace('/', "\\", $space.$parts[1]);
-            $className = basename($onlyPath);
-            if (strpos($fileContent, 'class '.$className) == FALSE) {
-                $console->showInfo("Apenas classes podem ser ofuscadas!");
-                $console->showInfo("Arquivo " . $filename . " ignorado!");
-                return FALSE;
-            }
-
-            // Muda o modo de execução no arquivo Client.php para PRODUÇÃO
-            if($className == 'Client') {
-                $fileContent = str_replace(
-                    '$this->setEnvironment(Kernel::ENV_DEVELOPMENT);',
-                    '$this->setEnvironment(Kernel::ENV_PRODUCTION);',
-                    $fileContent);
-            }
-
-            $codeObfuscator = new CodeObfuscator;
-            $encodeLevel = ($obfuscate != NULL && intval($obfuscate) > 0)
-                        ? $obfuscate : 1;
-            $code = $codeObfuscator->prepareCode($fileContent);
-
-
-            // FASE 1 -----------------
-
-            // No arquivo ArrayHash será inserida uma função camuflada
-            // chamada php_zencoding(), que será usada para descompactar
-            // o código ofuscado das próximas fases.
-            // Nível de ofuscação: BAIXO
-            if (basename($filename) == 'ArrayHash.php') {
-
-                $encoded = "";
-
-                // Esconde o ArrayHash
-                $encoded.= $codeObfuscator->toASCII("eval(base64_decode('");
-                $encoded.= base64_encode($code);
-                $encoded.= $codeObfuscator->toASCII("'));");
-
-                // Esconde a função
-                $phpZencoding = "function php_zencoding(\$data){
-                    \$partOne = mb_substr(\$data, 0, 10, 'utf-8');
-                    \$partTwo = mb_substr(\$data, 12, NULL, 'utf-8');
-                    return base64_decode(\$partOne . \$partTwo);
-                }";
-
-                $encoded.= $codeObfuscator->toASCII("eval(base64_decode('");
-                $encoded.= base64_encode($phpZencoding);
-                $encoded.= $codeObfuscator->toASCII("'));");
-
-                $encodedFileContents = "<?php\n eval(\"{$encoded}\");";
-            }
-
-            // FASE 2 -----------------
-
-            // No arquivo Object será inserida uma chamada de inclusão para
-            // o arquivo \Plexi\Db\Connection.php, onde se encontram as outras
-            // funções ocultas para reverter a ofuscação.
-            //
-            // Nível de ofuscação: MÉDIO
-            // Para referter o código, o hacker usará ferramentas de automação
-            // que revelam o código. Como estamos usando uma função personalizada
-            // Este processo não poderá prosseguir sem primeiro declarar
-            // a função php_zencoding.
-            // Outro agravante é que todos os códigos base64 são quebrados na
-            // criação dos arquivos e reestruturados na execução, impossibilitando
-            // as ferramentas de validar o código.
-            //
-            elseif (basename($filename) == 'Object.php') {
-
-                $insertion = "namespace Plexi\Common; require_once dirname(dirname(__FILE__)) "
-                    . ". DIRECTORY_SEPARATOR . 'Db' "
-                    . ". DIRECTORY_SEPARATOR . 'Connection.php'; ";
-
-                $code = str_replace('namespace Plexi\Common;', $insertion, $code);
-
-                $encoded = "";
-                $encoded.= $codeObfuscator->toASCII("eval(php_zencoding('");
-                $encoded.= baseOne($code);
-                $encoded.= $codeObfuscator->toASCII("'));");
-                $encodedFileContents = "<?php\n eval(\"{$encoded}\");";
-            }
-
-            // FASE 3 -----------------
-
-            // No arquivo \Plexi\Db\Connection.php, ocultamos as funções
-            // responsáveis pela execução dos códigos ofuscados.
-            //
-            // Nível de ofuscação: MÉDIO
-            // Mesmo caso da faze anterior
-            //
-            elseif (basename($filename) == 'Connection.php') {
-
-                $encoded = $codeObfuscator->encodeString($code, $encodeLevel);
-
-                $functionsFile = dirname(dirname(__FILE__))
-                    . DIRECTORY_SEPARATOR . 'Libs'
-                    . DIRECTORY_SEPARATOR . 'RevertObfuscation.php';
-                $functionsFileContent = file_get_contents($functionsFile);
-                if ($functionsFileContent != FALSE) {
-
-                    $functionsFileContent = $codeObfuscator->prepareCode($functionsFileContent);
-                    $stageOne.= $codeObfuscator->toASCII("eval(php_zencoding('");
-                    $stageOne.= baseOne($functionsFileContent);
-                    $stageOne.= $codeObfuscator->toASCII("'));");
-
-                    $encodedFileContents = "<?php\n eval(\"{$stageOne} {$encoded}\");";
-                }
-                else {
-                    $encodedFileContents = "<?php\n eval(\"{$encoded}\");";
-                }
-            }
-
-            // FASE 4 -----------------
-
-            // Os arquivos seguintes são todos revertidos com base nas funções
-            // ocultas geradas pelo CodeObfuscator, que são randômicas, ou seja,
-            // cada arquivo chamará funções diferentes, dificultando imensamente a
-            // possibilidade de criar rotinas para automatizar a tarefa de revelar
-            // o código ofuscado.
-            //
-            // Nível de ofuscação: ALTO
-            // Mesmo que o programador consiga chegar até aqui, ele terá que
-            // analizar arquivo por arquivo, decifrar todas as funções existentes
-            // e executá-las na sequencia certa. :)
-            else {
-
-                $encoded = $codeObfuscator->encodeString($code, $encodeLevel);
-                $encodedFileContents = "<?php\n eval(\"{$encoded}\");";
-            }
-
-            $console->showInfo("Arquivo " . $filename . " ofuscado com sucesso!");
-            return $encodedFileContents;
-        }
-        else {
-            return FALSE;
-        }
-    }
 }
