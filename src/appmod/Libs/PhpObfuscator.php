@@ -17,26 +17,67 @@ namespace Obfuscator\Libs;
  */
 class PhpObfuscator
 {
+    /**
+     * Controla se o código, depois de ofuscado, pode disparar erros para o
+     * usuário ou se eles devem ocorrer silenciosamente sem ser reportados
+     *
+     * @var bool
+     */
     private $decode_errors = true;
 
+    /**
+     * O código resultanre do processo de ofuscação
+     * é armazenado neste atributo.
+     *
+     * @var string
+     */
     private $obfuscated    = '';
 
-    private $errors        = [];
+    /**
+     * Armazena os erros ocorridos no momento de gerar o código ofuscado.
+     *
+     * @var array
+     */
+    private $encoding_messages        = [];
 
+    /**
+     * Função usada para desempacotar o código.
+     *
+     * @var string
+     */
     private $packer_function  = null;
 
+    /**
+     * Função usada para parametrizar o desempacotamento do código.
+     *
+     * @var string
+     */
     private $argumenter_function       = null;
 
+    /**
+     * Lista de funções ramdomicas com seus respectivos métodos de empacotamento/desempacotamento.
+     * Os empacotadores/desempacotadores são fornecidos sem o sufixo.
+     * Ex: 'packerOne' pode ser invocado
+     * como 'packerOnePack' para empacotar código ou
+     * como 'packerOneUnpack' para desempacotá-lo.
+     *
+     * @var array
+     */
     protected $map_packer_functions = [
-        'cfForgetShow'  => 'breakOne',
-        'cryptOf'       => 'breakTwo',
-        'unsetZeros'    => 'breakOne',
-        'deflatingNow'  => 'breakTwo',
-        'zeroizeCipher' => 'breakThree',
-        'iqutZ'         => 'breakTwo',
-        'sagaPlus'      => 'breakThree',
+        'cfForgetShow'  => 'packerOne',
+        'cryptOf'       => 'packerTwo',
+        'unsetZeros'    => 'packerOne',
+        'deflatingNow'  => 'packerTwo',
+        'zeroizeCipher' => 'packerThree',
+        'iqutZ'         => 'packerTwo',
+        'sagaPlus'      => 'packerThree',
     ];
 
+    /**
+     * Lista com as funções usadas para parametrizar o desempacotamento.
+     *
+     * @var array
+     */
     protected $map_argumenter_functions = [
         'decompressMD5',
         'unsetLogger',
@@ -46,8 +87,8 @@ class PhpObfuscator
     ];
 
     /**
-     * Habilita a liberação de erros de dentro do
-     * código já ofuscado
+     * Controla se o código, depois de ofuscado, pode disparar erros para o
+     * usuário ou se eles devem ocorrer silenciosamente sem ser reportados
      *
      * @param  boolean $enable
      * @return \Obfuscator\Libs\PhpObfuscator
@@ -59,8 +100,8 @@ class PhpObfuscator
     }
 
     /**
-     * Devolve o nome do 'empacotador' que, internamente,
-     * será responsável pela compressão/descompressão do código.
+     * Devolve um nome randomicamente escolhido para o 'empacotador' que,
+     * internamente, será responsável pela compressão/descompressão do código.
      *
      * @return string
      */
@@ -77,9 +118,10 @@ class PhpObfuscator
     }
 
     /**
-     * Devolve o nome do método que será copiado para dentro
-     * do 'empacotador' que, internamente, será responsável pela
-     * compressão/descompressão do código.
+     * Devolve um nome randomicamente escolhido para o método 'empacotador' que,
+     * internamente, será responsável pela compressão/descompressão do código.
+     * Este método será copiado para dentro de uma função que acompanhará o
+     * código ofuscado para permitir a descompressão.
      *
      * @return string
      */
@@ -90,10 +132,9 @@ class PhpObfuscator
     }
 
     /**
-     * Devolve o nome da função falsa que será usada como argumento do
-     * 'empacotador' no momento da descompressão do código.
-     * Trata-se de uma função que sempre retorna 'true',
-     * apenas com nomes ramdomicamente diferentes.
+     * Devolve um nome randomicamente escolhido para a função
+     * que será usada como argumento do desempacotador no ato
+     * de desafazer a ofuscação.
      *
      * @return string
      */
@@ -110,7 +151,7 @@ class PhpObfuscator
     }
 
     /**
-     * Ofusca o arquivo especificado.
+     * Ofusca o arquivo especificado e armazena-o na memória.
      *
      * @param  string $origin_file
      * @return \Obfuscator\Libs\PhpObfuscator
@@ -127,7 +168,7 @@ class PhpObfuscator
         $this->obfuscated = $this->obfuscateString($contents);
 
         if ($this->obfuscated == false) {
-            $this->errors[] = 'Código misto encontrado. Arquivo não ofuscado.';
+            $this->encoding_messages[] = 'Código misto encontrado. Arquivo não ofuscado.';
             $this->obfuscated = $contents;
         }
 
@@ -135,34 +176,28 @@ class PhpObfuscator
     }
 
     /**
-     * Ofusca o código espeficicado.
+     * Ofusca o código especificado através de uma string.
+     * Ativando o argumento $use_zencoding, a função 'php_zencoding'
+     * será usada no lugar das funções ramdômicas de desempacotamento.
+     * Isso torma mais fácil para um hacker descobrir a regra de
+     * desempacotamento, mas não necessita que sejam incluidas
+     * as funções randomicas junto com o código resultante da
+     * ofuscação.
      *
      * @param  string  $php_code
      * @param bool $use_zencoding força o uso da função php_zenconding
      * @return string
      */
-    public function obfuscateString(string $php_code, $use_zencoding = false)
+    public function obfuscateString(string $php_code, bool $use_zencoding = false)
     {
         $plain_code = $this->phpWrapperRemove($php_code);
         if ($plain_code == false) {
             return false;
         }
 
-        if ($use_zencoding == true) {
-            // A função php_zencodign é usada para ofuscar as 'funções de descompressão'
-            // usadas para desafazer a ofuscação de todos os arquivos php
-            $php_zencoding = "function php_zencoding(\$data)\n" . $this->extractMethod('breakOneUnpack');
-            $zen = '';
-            $zen .= $this->toASCII("eval(base64_decode("); // esconde a função de descompressão
-            $zen .= "'" . base64_encode($php_zencoding) . "'";  // executa a função compactar
-            $zen .= $this->toASCII("));");
-
-            $obfuscate = $this->phpWrapperAdd($zen);
-            $obfuscate.= $this->wrapZenCode($plain_code);
-            return $obfuscate;
-        }
-
-        return $this->wrapCode($plain_code);
+        return ($use_zencoding == true)
+            ? $this->wrapZenCode($plain_code)
+            : $this->wrapCode($plain_code);
     }
 
     /**
@@ -194,17 +229,17 @@ class PhpObfuscator
     {
         $prefix = ($this->decode_errors == false) ? '' : '@';
 
-        $string = '';
-
         $packer_method = $this->getPackerMethodName();
         $unpacker_function = $this->getPackerName();
         $argumenter  = $this->getArgumenterName();
 
+        // Esconde o código com o desempacotador ramdômico
+        $string = '';
         $string.= $this->toASCII($prefix. "eval({$unpacker_function}("); // esconde a função de descompressão
         $string.= "'" . $this->{$packer_method . "Pack"}($code) . "'";  // executa a função compactar
         $string.= $this->toASCII(",{$argumenter}()));");
 
-        return $this->phpWrapperAdd($string);
+        return "<?php eval(\"{$string}\");";
     }
 
     /**
@@ -217,25 +252,23 @@ class PhpObfuscator
     {
         $prefix = ($this->decode_errors == false) ? '' : '@';
 
-        $string = '';
+        // A função php_zencodign é usada para ofuscar as 'funções de descompressão'
+        // usadas para desafazer a ofuscação de todos os arquivos php
+        $php_zencoding = "function php_zencoding(\$data)\n" . $this->extractMethod('packerOneUnpack');
 
+        // Esconde a função zencoding no próprio arquivo
+        $zen = '';
+        $zen .= $this->toASCII($prefix. "eval(base64_decode("); // esconde a função de descompressão
+        $zen .= "'" . base64_encode($php_zencoding) . "'";  // executa a função compactar
+        $zen .= $this->toASCII("));");
+
+        // Esconde o código com o desempacotador php_zencoding
+        $string = '';
         $string.= $this->toASCII($prefix. "eval(php_zencoding("); // esconde a função de descompressão
-        $string.= "'" . $this->breakOnePack($code) . "'";         // comprime o código
+        $string.= "'" . $this->packerOnePack($code) . "'";         // comprime o código
         $string.= $this->toASCII("));");
 
-        return $this->phpWrapperAdd($string, true);
-    }
-
-    /**
-     * Adiciona os invólucros do PHP.
-     *
-     * @param  string $code
-     * @return string
-     */
-    protected function phpWrapperAdd(string $code, $hide_php = false) : string
-    {
-        $wrapper = ($hide_php == false) ? "<?php " : "";
-        return $wrapper . "eval(\"{$code}\");";
+        return "<?php eval(\"{$zen}\"); eval(\"{$string}\");";
     }
 
     /**
@@ -295,7 +328,7 @@ class PhpObfuscator
      */
     public function appendRevertFunctions($destiny)
     {
-        return (file_put_contents($destiny, $this->getRevertFileContents(true)) !== false);
+        $contents - $this->getRevertFileContents(true);
     }
 
     /**
@@ -315,14 +348,14 @@ class PhpObfuscator
         // As chaves e valores são no formato 'função_falsa => metodo'.
         // Ex.:
         // [
-        //     'cfForgetShow'  => 'breakOne',
-        //     'cryptOf'       => 'breakTwo',
+        //     'cfForgetShow'  => 'packerOne',
+        //     'cryptOf'       => 'packerTwo',
         //     ...
         // ]
         foreach($this->map_packer_functions as $fake_name => $method_name) {
 
-            // Transforma o nome do metodo 'breakOne' para a função 'baseOne'
-            $base_name = str_replace('break', 'base', $method_name);
+            // Transforma o nome do metodo 'packerOne' para a função 'baseOne'
+            $base_name = str_replace('packer', 'base', $method_name);
 
             $lines[] = $sp . "function {$fake_name}(\$data, \$revert = false){\n"
                      . $sp .$sp . "return {$base_name}(\$data);\n"
@@ -332,8 +365,8 @@ class PhpObfuscator
         $bases = array_unique($this->map_packer_functions);
         foreach($bases as $method_name) {
 
-            // Transforma o nome do metodo 'breakOne' para a função 'baseOne'
-            $base_name = str_replace('break', 'base', $method_name);
+            // Transforma o nome do metodo 'packerOne' para a função 'baseOne'
+            $base_name = str_replace('packer', 'base', $method_name);
 
             $lines[] = $sp . "function {$base_name}(\$data)\n"
                      . $this->extractMethod($method_name . 'Unpack');
@@ -348,6 +381,12 @@ class PhpObfuscator
         return ($obfuscate == true) ? $this->obfuscateString($contents, true) : $contents;
     }
 
+    /**
+     * Extrai o conteúdo de um metodo publico desta classe.
+     *
+     * @param  string $method_name
+     * @return string
+     */
     private function extractMethod($method_name)
     {
         $method = new \ReflectionMethod(__CLASS__, $method_name);
@@ -360,12 +399,12 @@ class PhpObfuscator
     }
 
     //
-    // Métodos para compactação e descompactação de código
-    // Estes métodos são adicionados automaticamente nas rotinas
-    // para que a ofuscação possa ser desfeita
+    // Métodos para empacotamento/desempacotamento de código
+    // Estes métodos são adicionados automaticamente no
+    // arquivo com as rotinas de desempacotamento.
     //
 
-    public function breakOnePack($data)
+    public function packerOnePack($data)
     {
         $encoded = base64_encode($data);
 
@@ -384,7 +423,7 @@ class PhpObfuscator
      * @param  boolean $revert
      * @return string
      */
-    public function breakOneUnpack($data, $revert = false)
+    public function packerOneUnpack($data, $revert = false)
     {
         // Separa em dois pedaços
         $partOne = mb_substr($data, 0, 10, "utf-8");
@@ -392,7 +431,7 @@ class PhpObfuscator
         return base64_decode($partOne . $partTwo);
     }
 
-    public function breakTwoPack($data)
+    public function packerTwoPack($data)
     {
         $encoded = base64_encode($data);
 
@@ -411,7 +450,7 @@ class PhpObfuscator
      * @param  boolean $revert
      * @return string
      */
-    public function breakTwoUnpack($data, $revert = false)
+    public function packerTwoUnpack($data, $revert = false)
     {
         // Separa em dois pedaços
         $partOne = mb_substr($data, 0, 5, "utf-8");
@@ -419,7 +458,7 @@ class PhpObfuscator
         return base64_decode($partOne . $partTwo);
     }
 
-    public function breakThreePack($data)
+    public function packerThreePack($data)
     {
         $encoded = base64_encode($data);
 
@@ -438,7 +477,7 @@ class PhpObfuscator
      * @param  boolean $revert
      * @return string
      */
-    public function breakThreeUnpack($data, $revert = false)
+    public function packerThreeUnpack($data, $revert = false)
     {
         // Separa em dois pedaços
         $partOne = mb_substr($data, 0, 15, "utf-8");

@@ -75,8 +75,8 @@ class PhpObfuscatorTest extends TestCase
             $string = self::getTestFileContents($file);
 
             $ob = new PhpObfuscatorAccessor;
-            $compressed = $ob->breakOnePack($string);
-            $this->assertEquals($string, $ob->breakOneUnpack($compressed));
+            $compressed = $ob->packerOnePack($string);
+            $this->assertEquals($string, $ob->packerOneUnpack($compressed));
         }
     }
 
@@ -87,8 +87,8 @@ class PhpObfuscatorTest extends TestCase
             $string = self::getTestFileContents($file);
 
             $ob = new PhpObfuscatorAccessor;
-            $compressed = $ob->breakTwoPack($string);
-            $this->assertEquals($string, $ob->breakTwoUnpack($compressed));
+            $compressed = $ob->packerTwoPack($string);
+            $this->assertEquals($string, $ob->packerTwoUnpack($compressed));
         }
     }
 
@@ -99,8 +99,8 @@ class PhpObfuscatorTest extends TestCase
             $string = self::getTestFileContents($file);
 
             $ob = new PhpObfuscatorAccessor;
-            $compressed = $ob->breakThreePack($string);
-            $this->assertEquals($string, $ob->breakThreeUnpack($compressed));
+            $compressed = $ob->packerThreePack($string);
+            $this->assertEquals($string, $ob->packerThreeUnpack($compressed));
         }
     }
 
