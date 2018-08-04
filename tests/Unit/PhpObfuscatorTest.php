@@ -9,9 +9,17 @@ class PhpObfuscatorTest extends TestCase
 {
     private $errors;
 
-    public static function getTempFile()
+    private $test_files = [
+        'PhpClass.stub',
+        'PhpClassClosed.stub',
+        'PhpClassNamespaced.stub',
+        'PhpProcedural.stub',
+        'PhpProceduralClosed.stub',
+    ];
+
+    public static function getTempFile($prefix = 'obfuscating_')
     {
-        return tempnam(sys_get_temp_dir(), 'obfuscating_') . ".php";
+        return tempnam(sys_get_temp_dir(), $prefix) . ".php";
     }
 
     public static function getTestFile($filename)
@@ -32,13 +40,7 @@ class PhpObfuscatorTest extends TestCase
 
     public function testPhpWrapperRemove()
     {
-        foreach ([
-            'PhpClass.stub',
-            'PhpClassClosed.stub',
-            'PhpClassNamespaced.stub',
-            'PhpProcedural.stub',
-            'PhpProceduralClosed.stub',
-            ] as $file) {
+        foreach ($this->test_files as $file) {
 
             $code = self::getTestFileContents($file);
             $this->assertContains('<?php', $code);
@@ -60,6 +62,46 @@ class PhpObfuscatorTest extends TestCase
 
         $removed = (new PhpObfuscatorAccessor)->accessPhpWrapperRemove($code);
         $this->assertFalse($removed);
+    }
+
+    //
+    // Compressão e descompressão
+    //
+
+    public function testBreakOne()
+    {
+        foreach ($this->test_files as $file) {
+
+            $string = self::getTestFileContents($file);
+
+            $ob = new PhpObfuscatorAccessor;
+            $compressed = $ob->breakOnePack($string);
+            $this->assertEquals($string, $ob->breakOneUnpack($compressed));
+        }
+    }
+
+    public function testBreakTwo()
+    {
+        foreach ($this->test_files as $file) {
+
+            $string = self::getTestFileContents($file);
+
+            $ob = new PhpObfuscatorAccessor;
+            $compressed = $ob->breakTwoPack($string);
+            $this->assertEquals($string, $ob->breakTwoUnpack($compressed));
+        }
+    }
+
+    public function testBreakThree()
+    {
+        foreach ($this->test_files as $file) {
+
+            $string = self::getTestFileContents($file);
+
+            $ob = new PhpObfuscatorAccessor;
+            $compressed = $ob->breakThreePack($string);
+            $this->assertEquals($string, $ob->breakThreeUnpack($compressed));
+        }
     }
 
     //
@@ -193,52 +235,114 @@ class PhpObfuscatorTest extends TestCase
         $this->assertTrue(true);
     }
 
-
-
-    public function testObfuscate()
+    public function testObfuscatePhpClass()
     {
-        foreach ([
-            'PhpClass.stub',
-            'PhpClassClosed.stub',
-            'PhpClassNamespaced.stub',
-            'PhpProcedural.stub',
-            'PhpProceduralClosed.stub',
-            ] as $file) {
+        $origin = self::getTestFile('PhpClass.stub');
+        $saved_file = self::getTempFile();
+        $saved_revert_file = self::getTempFile('revert_obfuscate_');
 
-            $origin = self::getTestFile($file);
-            $saved_file = self::getTempFile();
-            $saved_revert_file = self::getTempFile();
+        // Ofusca o arquivo e salva do disco
+        $ob = new PhpObfuscatorAccessor;
+        $ob->obfuscateFile($origin);
+        $this->assertTrue($ob->save($saved_file));
+        $this->assertTrue($ob->saveRevertFile($saved_revert_file));
 
-            // Ofusca o arquivo e salva do disco
-            $ob = (new PhpObfuscator)->obfuscateFile($origin);
-            $this->assertTrue($ob->save($saved_file));
-            $this->assertTrue($ob->saveRevertFile($saved_revert_file));
+        // Inclusão do arquivo com as funções de reversão
+        //dd(file_get_contents($saved_revert_file));
+        require_once $saved_revert_file;
 
-            dd(file_get_contents($saved_revert_file));
+        // Inclusão do arquivo ofuscado
+        require_once $saved_file;
 
-            // Inclusão do arquivo com as funções de reversão
-            require_once $saved_revert_file;
-
-            // Inclusão do arquivo ofuscado
-            require_once $saved_file;
-
-            // Executa a classe ofuscada
-            $call_name = pathinfo($file, PATHINFO_FILENAME);
-            if (in_array($call_name, ['PhpProcedural', 'PhpProceduralClosed'])) {
-                // Classes comuns
-                $this->assertEquals($call_name(), $call_name . ' executando com sucesso');
-
-            } elseif($call_name == 'PhpClassNamespaced') {
-                // Classes com namespace
-                $call_namespaced = 'Php\Name\Space\\' . $call_name;
-                $this->assertEquals((new $call_namespaced)->method(), $call_namespaced . ' executando com sucesso');
-
-            } else {
-                // Funções
-                $this->assertEquals((new $call_name)->method(), $call_name . ' executando com sucesso');
-            }
-        }
+        // Funções
+        $this->assertEquals((new \PhpClass)->method(), 'PhpClass executando com sucesso');
     }
 
+    public function testObfuscatePhpClassClosed()
+    {
+        $origin = self::getTestFile('PhpClassClosed.stub');
+        $saved_file = self::getTempFile();
+        $saved_revert_file = self::getTempFile('revert_obfuscate_');
+
+        // Ofusca o arquivo e salva do disco
+        $ob = new PhpObfuscatorAccessor;
+        $ob->obfuscateFile($origin);
+        $this->assertTrue($ob->save($saved_file));
+        $this->assertTrue($ob->saveRevertFile($saved_revert_file));
+
+        // As funções de reversão já estão na memória pois o
+        // arquivo foi incluido no teste testObfuscatePhpClass
+
+        // Inclusão do arquivo ofuscado
+        require_once $saved_file;
+
+        // Funções
+        $this->assertEquals((new \PhpClassClosed)->method(), 'PhpClassClosed executando com sucesso');
+    }
+
+    public function testObfuscatePhpClassNamespaced()
+    {
+        $origin = self::getTestFile('PhpClassNamespaced.stub');
+        $saved_file = self::getTempFile();
+        $saved_revert_file = self::getTempFile('revert_obfuscate_');
+
+        // Ofusca o arquivo e salva do disco
+        $ob = new PhpObfuscatorAccessor;
+        $ob->obfuscateFile($origin);
+        $this->assertTrue($ob->save($saved_file));
+        $this->assertTrue($ob->saveRevertFile($saved_revert_file));
+
+        // As funções de reversão já estão na memória pois o
+        // arquivo foi incluido no teste testObfuscatePhpClass
+
+        // Inclusão do arquivo ofuscado
+        require_once $saved_file;
+
+        $this->assertEquals((new \Php\Name\Space\PhpClassNamespaced)->method(), 'Php\Name\Space\PhpClassNamespaced executando com sucesso');
+    }
+
+    public function testObfuscatePhpProcedural()
+    {
+        $origin = self::getTestFile('PhpProcedural.stub');
+        $saved_file = self::getTempFile();
+        $saved_revert_file = self::getTempFile('revert_obfuscate_');
+
+        // Ofusca o arquivo e salva do disco
+        $ob = new PhpObfuscatorAccessor;
+        $ob->obfuscateFile($origin);
+        $this->assertTrue($ob->save($saved_file));
+        $this->assertTrue($ob->saveRevertFile($saved_revert_file));
+
+        // As funções de reversão já estão na memória pois o
+        // arquivo foi incluido no teste testObfuscatePhpClass
+
+        // Inclusão do arquivo ofuscado
+        require_once $saved_file;
+
+        // Funções
+        $this->assertEquals(\PhpProcedural(), 'PhpProcedural executando com sucesso');
+    }
+
+    public function testObfuscatePhpProceduralClosed()
+    {
+        $origin = self::getTestFile('PhpProceduralClosed.stub');
+        $saved_file = self::getTempFile();
+        $saved_revert_file = self::getTempFile('revert_obfuscate_');
+
+        // Ofusca o arquivo e salva do disco
+        $ob = new PhpObfuscatorAccessor;
+        $ob->obfuscateFile($origin);
+        $this->assertTrue($ob->save($saved_file));
+        $this->assertTrue($ob->saveRevertFile($saved_revert_file));
+
+        // As funções de reversão já estão na memória pois o
+        // arquivo foi incluido no teste testObfuscatePhpClass
+
+        // Inclusão do arquivo ofuscado
+        require_once $saved_file;
+
+        // Funções
+        $this->assertEquals(\PhpProceduralClosed(), 'PhpProceduralClosed executando com sucesso');
+    }
 
 }

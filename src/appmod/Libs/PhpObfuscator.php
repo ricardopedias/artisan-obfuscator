@@ -138,13 +138,28 @@ class PhpObfuscator
      * Ofusca o código espeficicado.
      *
      * @param  string  $php_code
+     * @param bool $use_zencoding força o uso da função php_zenconding
      * @return string
      */
-    public function obfuscateString(string $php_code)
+    public function obfuscateString(string $php_code, $use_zencoding = false)
     {
         $plain_code = $this->phpWrapperRemove($php_code);
         if ($plain_code == false) {
             return false;
+        }
+
+        if ($use_zencoding == true) {
+            // A função php_zencodign é usada para ofuscar as 'funções de descompressão'
+            // usadas para desafazer a ofuscação de todos os arquivos php
+            $php_zencoding = "function php_zencoding(\$data)\n" . $this->extractMethod('breakOneUnpack');
+            $zen = '';
+            $zen .= $this->toASCII("eval(base64_decode("); // esconde a função de descompressão
+            $zen .= "'" . base64_encode($php_zencoding) . "'";  // executa a função compactar
+            $zen .= $this->toASCII("));");
+
+            $obfuscate = $this->phpWrapperAdd($zen);
+            $obfuscate.= $this->wrapZenCode($plain_code);
+            return $obfuscate;
         }
 
         return $this->wrapCode($plain_code);
@@ -179,16 +194,36 @@ class PhpObfuscator
     {
         $prefix = ($this->decode_errors == false) ? '' : '@';
 
+        $string = '';
+
         $packer_method = $this->getPackerMethodName();
         $unpacker_function = $this->getPackerName();
         $argumenter  = $this->getArgumenterName();
 
-        $string = '';
-        $string.= $this->toASCII($prefix. "eval({$unpacker_function}("); // esconde a função descompactar
-        $string.= "'" . $this->{$packer_method . "Pack"}($code) . "'";            // executa a função compactar
-        $string.= $this->toASCII(",{$argumenter}())); ");
+        $string.= $this->toASCII($prefix. "eval({$unpacker_function}("); // esconde a função de descompressão
+        $string.= "'" . $this->{$packer_method . "Pack"}($code) . "'";  // executa a função compactar
+        $string.= $this->toASCII(",{$argumenter}()));");
 
         return $this->phpWrapperAdd($string);
+    }
+
+    /**
+     * Embrulha o código num container de ofuscação para o php_zencoding.
+     *
+     * @param  string $code
+     * @return string
+     */
+    public function wrapZenCode(string $code)
+    {
+        $prefix = ($this->decode_errors == false) ? '' : '@';
+
+        $string = '';
+
+        $string.= $this->toASCII($prefix. "eval(php_zencoding("); // esconde a função de descompressão
+        $string.= "'" . $this->breakOnePack($code) . "'";         // comprime o código
+        $string.= $this->toASCII("));");
+
+        return $this->phpWrapperAdd($string, true);
     }
 
     /**
@@ -197,9 +232,10 @@ class PhpObfuscator
      * @param  string $code
      * @return string
      */
-    protected function phpWrapperAdd(string $code) : string
+    protected function phpWrapperAdd(string $code, $hide_php = false) : string
     {
-        return "<?php\n eval(\"{$code}\");";
+        $wrapper = ($hide_php == false) ? "<?php " : "";
+        return $wrapper . "eval(\"{$code}\");";
     }
 
     /**
@@ -248,7 +284,18 @@ class PhpObfuscator
      */
     public function saveRevertFile($destiny)
     {
-        return (file_put_contents($destiny, $this->getRevertFileContents(false)) !== false);
+        return (file_put_contents($destiny, $this->getRevertFileContents(true)) !== false);
+    }
+
+    /**
+     * Coloca as funções de reversão no final do arquivo especificado.
+     *
+     * @param  string $destiny
+     * @return bool
+     */
+    public function appendRevertFunctions($destiny)
+    {
+        return (file_put_contents($destiny, $this->getRevertFileContents(true)) !== false);
     }
 
     /**
@@ -289,7 +336,7 @@ class PhpObfuscator
             $base_name = str_replace('break', 'base', $method_name);
 
             $lines[] = $sp . "function {$base_name}(\$data)\n"
-                     . $this->extractMethod('breakOneUnpack');
+                     . $this->extractMethod($method_name . 'Unpack');
         }
 
         foreach($this->map_argumenter_functions as $method_name) {
@@ -298,7 +345,7 @@ class PhpObfuscator
 
         $contents = "<?php\n" . implode("\n", $lines);
 
-        return ($obfuscate == true) ? $this->obfuscateString($contents) : $contents;
+        return ($obfuscate == true) ? $this->obfuscateString($contents, true) : $contents;
     }
 
     private function extractMethod($method_name)
