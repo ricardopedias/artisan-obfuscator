@@ -26,7 +26,7 @@ class PhpObfuscator
     private $decode_errors = true;
 
     /**
-     * O código resultanre do processo de ofuscação
+     * O código resultante do processo de ofuscação
      * é armazenado neste atributo.
      *
      * @var string
@@ -57,11 +57,12 @@ class PhpObfuscator
     /**
      * Lista de funções ramdomicas com seus respectivos métodos de empacotamento/desempacotamento.
      * Os empacotadores/desempacotadores são fornecidos sem o sufixo.
-     * Ex: 'packerOne' pode ser invocado
-     * como 'packerOnePack' para empacotar código ou
-     * como 'packerOneUnpack' para desempacotá-lo.
+     * Ex: 'packerOne' pode ser invocado:
+     * - como 'packerOnePack' para empacotar código ou
+     * - como 'packerOneUnpack' para desempacotá-lo.
      *
      * @var array
+     * @todo Mudar isso para que os nomes sejam gerados dinamicamente
      */
     protected $map_packer_functions = [
         'cfForgetShow'  => 'packerOne',
@@ -77,6 +78,7 @@ class PhpObfuscator
      * Lista com as funções usadas para parametrizar o desempacotamento.
      *
      * @var array
+     * @todo Mudar isso para que os nomes sejam gerados dinamicamente
      */
     protected $map_argumenter_functions = [
         'decompressMD5',
@@ -151,6 +153,26 @@ class PhpObfuscator
     }
 
     /**
+     * Remove os invólucros do PHP <?php e ?>
+     * do código especificado
+     *
+     * @param string $code Código php sem ofuscar
+     * @return string
+     */
+    protected function phpWrapperRemove(string $code)
+    {
+        $matches = [];
+        preg_match_all('/\<\?php|\<\?\=/i', $code, $matches);
+
+        // Código misto não será ofuscado
+        if(isset($matches[0]) && count($matches[0]) > 1) {
+            return false;
+        } else {
+            return trim(str_replace(["<?php", "<?", "?>"], "", $code));
+        }
+    }
+
+    /**
      * Ofusca o arquivo especificado e armazena-o na memória.
      *
      * @param  string $origin_file
@@ -176,47 +198,19 @@ class PhpObfuscator
     }
 
     /**
-     * Ofusca o código especificado através de uma string.
-     * Ativando o argumento $use_zencoding, a função 'php_zencoding'
-     * será usada no lugar das funções ramdômicas de desempacotamento.
-     * Isso torma mais fácil para um hacker descobrir a regra de
-     * desempacotamento, mas não necessita que sejam incluidas
-     * as funções randomicas junto com o código resultante da
-     * ofuscação.
+     * Devolve o código php especificado de forma ofuscada.
      *
      * @param  string  $php_code
-     * @param bool $use_zencoding força o uso da função php_zenconding
      * @return string
      */
-    public function obfuscateString(string $php_code, bool $use_zencoding = false)
+    public function obfuscateString(string $php_code)
     {
         $plain_code = $this->phpWrapperRemove($php_code);
         if ($plain_code == false) {
             return false;
         }
 
-        return ($use_zencoding == true)
-            ? $this->wrapZenCode($plain_code)
-            : $this->wrapCode($plain_code);
-    }
-
-    /**
-     * Remove os invólucros do PHP
-     *
-     * @param string $code Código php sem ofuscar
-     * @return string
-     */
-    protected function phpWrapperRemove(string $code)
-    {
-        $matches = [];
-        preg_match_all('/\<\?php|\<\?\=/i', $code, $matches);
-
-        // Código misto não será ofuscado
-        if(isset($matches[0]) && count($matches[0]) > 1) {
-            return false;
-        } else {
-            return trim(str_replace(["<?php", "<?", "?>"], "", $code));
-        }
+        return $this->wrapString($plain_code);
     }
 
     /**
@@ -225,7 +219,7 @@ class PhpObfuscator
      * @param  string $code
      * @return string
      */
-    public function wrapCode(string $code)
+    public function wrapString(string $code)
     {
         $prefix = ($this->decode_errors == false) ? '' : '@';
 
@@ -243,12 +237,31 @@ class PhpObfuscator
     }
 
     /**
-     * Embrulha o código num container de ofuscação para o php_zencoding.
+     * Devolve o código php especificado de forma ofuscada.
+     * A string especificada deve conter apenas as funções de desempacotamento,
+     * pois a forma de ofuscação é diferente para elas poderem funcionar.
+     *
+     * @param  string  $unpack_code
+     * @return string
+     */
+    public function obfuscateUnpackFunctions(string $unpack_code)
+    {
+        $plain_code = $this->phpWrapperRemove($unpack_code);
+        if ($plain_code == false) {
+            return false;
+        }
+
+        return $this->wrapUnpackFunctions($plain_code);
+    }
+
+    /**
+     * Embrulha o código num container de ofuscação.
+     * Este método é usado apenas para empacotar as funções de desempacotamento.
      *
      * @param  string $code
      * @return string
      */
-    public function wrapZenCode(string $code)
+    public function wrapUnpackFunctions(string $code)
     {
         $prefix = ($this->decode_errors == false) ? '' : '@';
 
@@ -256,15 +269,15 @@ class PhpObfuscator
         // usadas para desafazer a ofuscação de todos os arquivos php
         $php_zencoding = "function php_zencoding(\$data)\n" . $this->extractMethod('packerOneUnpack');
 
-        // Esconde a função zencoding no próprio arquivo
+        // Esconde a função de desempacotamento no próprio arquivo
         $zen = '';
-        $zen .= $this->toASCII($prefix. "eval(base64_decode("); // esconde a função de descompressão
+        $zen .= $this->toASCII($prefix . "eval(base64_decode("); // esconde a função de descompressão
         $zen .= "'" . base64_encode($php_zencoding) . "'";  // executa a função compactar
         $zen .= $this->toASCII("));");
 
         // Esconde o código com o desempacotador php_zencoding
         $string = '';
-        $string.= $this->toASCII($prefix. "eval(php_zencoding("); // esconde a função de descompressão
+        $string.= $this->toASCII($prefix . "eval(php_zencoding("); // esconde a função de descompressão
         $string.= "'" . $this->packerOnePack($code) . "'";         // comprime o código
         $string.= $this->toASCII("));");
 
@@ -274,6 +287,7 @@ class PhpObfuscator
     /**
      * Transforma a string em código hexadecimal ASCII.
      *
+     * @see http://php.net/manual/en/function.bin2hex.php
      * @param string $string
      * @return string
      */
@@ -290,6 +304,8 @@ class PhpObfuscator
 
     /**
      * Devolve o código resultante do processo de ofuscação.
+     * Se a ofuscação ocorrer com sucesso, uma string ofuscada será devolvida,
+     * caso contrário, a string original será retornada no lugar.
      *
      * @return string
      */
@@ -299,90 +315,93 @@ class PhpObfuscator
     }
 
     /**
-     * Salva o código ofuscado no destino especificado.
+     * Salva um arquivo com o código ofuscado no caminho especificado.
      *
-     * @param  string $destiny
+     * @param  string $path_destiny
      * @return bool
      */
-    public function save($destiny)
+    public function save($path_destiny)
     {
-        return (file_put_contents($destiny, $this->getObfuscated()) !== false);
+        return (file_put_contents($path_destiny, $this->getObfuscated()) !== false);
     }
 
     /**
-     * Salva as funções responsáveis pela reversão da ofuscação.
+     * Salva um arquivo com as funções de desempacotamento no caminho especificado.
+     * Este arquivo deve ser incluído no projeto antes de qualquer arquivo ofuscado,
+     * para que as ofuscações possam ser revertidas em tempo real.
      *
-     * @param  string $destiny
+     * @param  string $path_destiny
      * @return bool
      */
-    public function saveRevertFile($destiny)
+    public function saveRevertFile($path_destiny)
     {
-        return (file_put_contents($destiny, $this->getRevertFileContents(true)) !== false);
+        $contents = $this->getRevertFileContents(true); // true = conteudo ofuscado
+        return (file_put_contents($path_destiny, $contents) !== false);
     }
 
     /**
-     * Coloca as funções de reversão no final do arquivo especificado.
-     *
-     * @param  string $destiny
-     * @return bool
-     */
-    public function appendRevertFunctions($destiny)
-    {
-        $contents - $this->getRevertFileContents(true);
-    }
-
-    /**
-     * Gera o conteúdo do arquivo com as funções de reversão.
+     * Gera uma string contendo todas as funções de desempacotamento.
      *
      * @param  boolean $obfuscate
      * @return string
      */
     protected function getRevertFileContents($obfuscate = true)
     {
-
         $lines = [];
 
         $sp = "    ";
 
-        // Cria os desempacotadores falsos.
-        // As chaves e valores são no formato 'função_falsa => metodo'.
+        // DESEMPACOTADORES RANDÔMICOS:
+        // São várias funções 'falsas' com nomes ramdômicos que,
+        // internamente, invocam as funções reais de desempacotamento.
+        // Apenas para dificultar o entendimento do hacker :)
+        //
+        // As chaves e valores são no formato 'desempacotador => metodo'.
         // Ex.:
-        // [
-        //     'cfForgetShow'  => 'packerOne',
-        //     'cryptOf'       => 'packerTwo',
-        //     ...
-        // ]
-        foreach($this->map_packer_functions as $fake_name => $method_name) {
-
-            // Transforma o nome do metodo 'packerOne' para a função 'baseOne'
+        // 'cfForgetShow'  => 'packerOne',
+        // 'cryptOf'       => 'packerTwo',
+        foreach($this->map_packer_functions as $packer_name => $method_name) {
+            // Renomeia o prefixo do método 'packerOne'
+            // para nomear na função de desempacotamento como 'baseOne'
             $base_name = str_replace('packer', 'base', $method_name);
-
-            $lines[] = $sp . "function {$fake_name}(\$data, \$revert = false){\n"
+            $lines[] = $sp . "function {$packer_name}(\$data, \$revert = false){\n"
                      . $sp .$sp . "return {$base_name}(\$data);\n"
                      . $sp . "}\n";
         }
 
+        // DESEMPACOTADORES REAIS:
+        // Os desempacotadores randômicos invocam três 'efetivos':
+        // baseOne, baseTwo e baseThree
         $bases = array_unique($this->map_packer_functions);
         foreach($bases as $method_name) {
-
-            // Transforma o nome do metodo 'packerOne' para a função 'baseOne'
+            // Renomeia o prefixo do método 'packerOne'
+            // para nomear na função de desempacotamento como 'baseOne'
             $base_name = str_replace('packer', 'base', $method_name);
-
             $lines[] = $sp . "function {$base_name}(\$data)\n"
+                     // Extrai o conteúdo do método 'packer???Unpack'
+                     // para gerar a função 'base???'
                      . $this->extractMethod($method_name . 'Unpack');
         }
 
+        // ARGUMENTADORES RAMDÔMICOS:
+        // São várias funções 'falsas' com nomes ramdômicos que,
+        // internamente apenas devolvem uma valor booleano e que
+        // serão usadas como argumentos da função desempacotadora
+        //
+        // Veja como isso é feito no método wrapString
         foreach($this->map_argumenter_functions as $method_name) {
             $lines[] = $sp . "function {$method_name}() { return TRUE; }\n";
         }
 
         $contents = "<?php\n" . implode("\n", $lines);
-
-        return ($obfuscate == true) ? $this->obfuscateString($contents, true) : $contents;
+        return ($obfuscate == true) ? $this->obfuscateUnpackFunctions($contents) : $contents;
     }
 
     /**
-     * Extrai o conteúdo de um metodo publico desta classe.
+     * Extrai o conteúdo de um método público de desenpacotamento 'packer???Unpack',
+     * existente nesta classe. O conteúdo do método será usado para gerar as funções
+     * de desempacotamento.
+     * Veja como isso é feito no método getRevertFileContents
      *
      * @param  string $method_name
      * @return string
@@ -399,11 +418,23 @@ class PhpObfuscator
     }
 
     //
-    // Métodos para empacotamento/desempacotamento de código
-    // Estes métodos são adicionados automaticamente no
-    // arquivo com as rotinas de desempacotamento.
+    // Os métodos abaixo são responsáveis pelo empacotamento do código
+    //
+    // PACK: Os métodos com sufixo 'Pack', por exemplo 'packerOnePack',
+    // são responsáveis pelo empacotamento do código.
+    //
+    // UNPACK: O conteúdo dos métodos com sufixo 'Unpack', por exemplo 'packerOneUnpack',
+    // são extraídos para gerar as funções responsáveis pelo
+    // desempacotamento do código ofuscado.
     //
 
+    /**
+     * Empacota o codigo especificado.
+     *
+     * @param  string $data
+     * @return string
+     * @todo Mudar a sigla 'Sg' para que seja gerada dinamica e randomicamente
+     */
     public function packerOnePack($data)
     {
         $encoded = base64_encode($data);
@@ -431,6 +462,13 @@ class PhpObfuscator
         return base64_decode($partOne . $partTwo);
     }
 
+    /**
+     * Empacota o codigo especificado.
+     *
+     * @param  string $data
+     * @return string
+     * @todo Mudar a sigla 'Sg' para que seja gerada dinamica e randomicamente
+     */
     public function packerTwoPack($data)
     {
         $encoded = base64_encode($data);
@@ -458,6 +496,13 @@ class PhpObfuscator
         return base64_decode($partOne . $partTwo);
     }
 
+    /**
+     * Empacota o codigo especificado.
+     *
+     * @param  string $data
+     * @return string
+     * @todo Mudar a sigla 'Sg' para que seja gerada dinamica e randomicamente
+     */
     public function packerThreePack($data)
     {
         $encoded = base64_encode($data);
