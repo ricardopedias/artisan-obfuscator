@@ -48,6 +48,13 @@ class BaseCommand extends Command
     protected $unpack_file = 'App.php';
 
     /**
+     * Armazena as mensagens disparadas pelo processo de ofuscação.
+     *
+     * @var array
+     */
+    protected messages = [];
+
+    /**
      * Links encontrados no processo de ofuscação.
      *
      * @var array
@@ -95,7 +102,7 @@ class BaseCommand extends Command
         $this->files_path = rtrim($path, "/");
 
         if(is_file($this->getComposerFile()) === false) {
-            throw new \InvalidArgumentException('Invalid directory');
+            throw new \InvalidArgumentException('Arquivo composer.json não foi encontrado');
         }
 
         return $this;
@@ -143,7 +150,7 @@ class BaseCommand extends Command
      */
     protected function getUnpackFile()
     {
-        return $this->files_path . DIRECTORY_SEPARATOR . $unpack_file;
+        return $this->files_path . DIRECTORY_SEPARATOR . $this->unpack_file;
     }
 
     /**
@@ -245,19 +252,18 @@ class BaseCommand extends Command
     {
         if (is_dir($path) && is_writable($path) == false) {
             // Diretório já existe, mas não é gravável
-            $this->error("O diretório {$path} já existe mas você não tem permissão para escrever nele");
+            throw new \RuntimeException("O diretório {$path} já existe mas você não tem permissão para escrever nele");
             return false;
 
         } elseif (is_dir($path) == true) {
             // O diretório já existe
-            $this->info("O diretório {$path} já existe");
             return true;
         }
 
         if (@mkdir($path, 0755, $force) == true) {
             return true;
         } else {
-            $this->info("Não foi possível criar o diretório {$path}");
+            throw new \RuntimeException("Não foi possível criar o diretório {$path}");
             return false;
         }
 
@@ -287,14 +293,12 @@ class BaseCommand extends Command
     {
         $ob = $this->getObfuscator()->obfuscateFile($php_file);
         if($ob == false) {
-            $this->error("Ocorreu um erro ao tentar ofuscar o arquivo");
-            $this->error("# {$php_file}");
+            throw new \RuntimeException("Ocorreu um erro ao tentar ofuscar o arquivo {$php_file}");
             return false;
         }
 
         if($ob->save($obfuscated_file) == false) {
-            $this->error("Ocorreu um erro ao tentar salvar o arquivo ofuscado");
-            $this->error("# {$obfuscated_file}");
+            throw new \RuntimeException("Ocorreu um erro ao tentar salvar o arquivo ofuscado {$obfuscated_file}");
             return false;
         }
 
@@ -324,7 +328,7 @@ class BaseCommand extends Command
         // que desfazem a ofuscação do código
         $revert_file = $this->getUnpackFile();
         if($this->getObfuscator()->saveRevertFile($revert_file) == false) {
-            $this->error("Ocorreu um erro ao tentar criar o arquivo de reversão");
+            throw new \RuntimeException("Ocorreu um erro ao tentar criar o arquivo de reversão");
             return false;
         }
         $this->info("- Arquivo {$revert_file} criado com sucesso");
@@ -335,7 +339,7 @@ class BaseCommand extends Command
 
         // Cria o autoloader com os arquivos ofuscados
         if ($this->generateAutoloader($index) == false) {
-            $this->error("Não foi possível gerar o autoloader em {$path_current}");
+            throw new \RuntimeException("Não foi possível gerar o autoloader em {$path_current}");
             return false;
         }
 
@@ -363,14 +367,14 @@ class BaseCommand extends Command
             $this->warning('O novo backup foi abortado para manter a integridade do backup original!');
 
         } elseif(rename($path_current, $path_backup) === false) {
-            $this->error("Não foi possível fazer o backup de {$path_current}");
+            throw new \RuntimeException("Não foi possível fazer o backup de {$path_current}");
             return false;
         }
 
         // Renomeia o diretório com os arquivos ofuscados
         // para ser o novo diretório em execução
         if(rename($path_obfuscated, $path_current) === false) {
-            $this->error("Não foi possível tornar {$path_obfuscated} o diretório efetivo");
+            throw new \RuntimeException("Não foi possível tornar {$path_obfuscated} o diretório efetivo");
             return false;
         }
 
@@ -489,7 +493,7 @@ class BaseCommand extends Command
         }
 
         if (file_put_contents($composer_file, json_encode($contents, JSON_PRETTY_PRINT)) === false) {
-            $this->error("Não foi possível atualizar o arquivo  {$composer_file}");
+            throw new \RuntimeException("Não foi possível atualizar o arquivo  {$composer_file}");
             return false;
         }
 
