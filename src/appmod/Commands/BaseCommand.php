@@ -12,86 +12,252 @@ namespace Obfuscator\Commands;
 use Illuminate\Console\Command;
 use Obfuscator\Libs\PhpObfuscator;
 
-abstract class BaseCommand extends Command
+class BaseCommand extends Command
 {
+    /**
+     * Caminho completo até o diretório contendo
+     * os arquivos que devem ser ofuscados.
+     *
+     * @var string
+     */
+    protected $files_path = null;
 
+    /**
+     * Nome do diretório onde os arquivos
+     * ofuscados devem ser salvos.
+     *
+     * @var string
+     */
+    protected $obfuscated_dir = 'app_obfuscated';
+
+    /**
+     * Nome do diretório onde os arquivos originais
+     * devem ser copiados como backup.
+     *
+     * @var string
+     */
+    protected $backup_dir = 'app_backup';
+
+    /**
+     * Nome do arquivo que que conterá as funções de reversão.
+     * Este arquivo sejá gerado pelo processo de ofuscação automaticamente
+     * e adicionado no arquivo 'autoloader.php' da aplicação.
+     *
+     * @var string
+     */
+    protected $unpack_file = 'App.php';
+
+    /**
+     * Links encontrados no processo de ofuscação.
+     *
+     * @var array
+     */
     private $links = [];
 
     /**
-     * A biblioteca de ofuscação
+     * Atributo que armazena a instancia da biblioteca de ofuscação.
      *
-     * @var PhpObfuscator
+     * @var Obfuscator\Libs\PhpObfuscator
      */
     protected $obfuscator;
 
-    protected $ds = DIRECTORY_SEPARATOR;
-
     /**
-     * Create a new command instance.
+     * Cria uma nova instância do comando.
      *
-     * @param  PhpObfuscator  $obfuscator
+     * @param  Obfuscator\Libs\PhpObfuscator  $obfuscator
      * @return void
      */
-    public function __construct(PhpObfuscator $obfuscator)
+    public function __construct()
     {
+        $this->obfuscator = new PhpObfuscator;
         parent::__construct();
-
-        $this->obfuscator = $obfuscator;
     }
 
-    abstract protected function getBasePath();
-
+    /**
+     * Devolve a instância usada para ofuscar os arquivos.
+     *
+     * @return Obfuscator\Libs\PhpObfuscator
+     */
     protected function getObfuscator()
     {
         return $this->obfuscator;
     }
 
     /**
-     * Resolve a localização real do diretório especificado.
+     * Seta o caminho completo até o diretório contendo
+     * os arquivos que devem ser ofuscados.
      *
-     * @param  string $path
-     * @return string
+     * @param string $path
+     * @return Obfuscator\Libs\PhpObfuscator
      */
-    protected function parsePath($path)
+    protected function setFilesPath($path)
     {
-        if ($path == '.') {
-            $path = $this->getBasePath();
-        }
-        elseif ($path[0] != '/') {
-            $path = trim($path, $this->ds);
-            $path = $this->getBasePath() . $this->ds . $path;
+        $this->files_path = rtrim($path, "/");
+
+        if(is_file($this->getComposerFile()) === false) {
+            throw new \InvalidArgumentException('Invalid directory');
         }
 
-        return $path;
+        return $this;
+    }
+
+    /**
+     * Devolve a localização do diretório contendo
+     * os arquivos que devem ser ofuscados.
+     *
+     * @return string
+     */
+    protected function getFilesPath()
+    {
+        return $this->files_path;
+    }
+
+    /**
+     * Devolve a localização do diretório onde os arquivos
+     * ofuscados devem ser salvos.
+     *
+     * @return string
+     */
+    protected function getObfuscatedPath()
+    {
+        return dirname($this->files_path) . DIRECTORY_SEPARATOR . $this->obfuscated_dir;
+    }
+
+    /**
+     * Devolve a localização do diretório onde os
+     * arquivos originais devem ser copiados como backup.
+     *
+     * @return string
+     */
+    protected function getBackupPath()
+    {
+        return dirname($this->files_path) . DIRECTORY_SEPARATOR . $this->backup_dir;
+    }
+
+    /**
+     * Devolve a localização do arquivo que conterá as funções de reversão.
+     * Este arquivo sejá gerado pelo processo de ofuscação automaticamente
+     * e adicionado no arquivo 'autoloader.php' da aplicação.
+     *
+     * @return string
+     */
+    protected function getUnpackFile()
+    {
+        return $this->files_path . DIRECTORY_SEPARATOR . $unpack_file;
+    }
+
+    /**
+     * Devolve a localização do arquivo composer.json.
+     *
+     * @return string
+     */
+    protected function getComposerFile()
+    {
+        return dirname($this->files_path) . DIRECTORY_SEPARATOR . 'composer.json';
+    }
+
+    /**
+     * Varre o o diretório especificado, ofuscando os arquivos e
+     * salvando no diretório de destino.
+     *
+     * @param  string $path_current
+     * @param  string $path_obfuscated
+     * @return boolean
+     */
+    protected function obfuscateDirectory($path_current, $path_obfuscated)
+    {
+        if (is_readable($path_current) == false) {
+            $this->error("Você não tem permissão para ler o diretório {$path_current}");
+            return false;
+        }
+
+        // Lista os arquivos do diretório
+        $list = scandir($path_current);
+        if (count($list) == 2) { // '.', '..'
+            // se não houverem arquivos, ignora o diretório
+            return true;
+        }
+
+        $this->line("-------------------------------------------------------");
+        $this->line("Ofuscando '{$path_current}'");
+        $this->line("-------------------------------------------------------");
+
+        // Cria o mesmo diretório para os arquivos ofuscados
+        if ($this->makeDir($path_obfuscated) == false) {
+            return false;
+        }
+
+        foreach ($list as $item) {
+
+            if (in_array($item, ['.', '..']) ) {
+                continue;
+            }
+
+            $iterate_current_item    = $path_current . DIRECTORY_SEPARATOR . $item;
+            $iterate_obfuscated_item = $path_obfuscated . DIRECTORY_SEPARATOR . $item;
+
+            if (is_link($iterate_current_item)) {
+
+                // LINKS
+                // TODO: recriar os links
+                $link = readlink($iterate_current_item);
+                $this->links[$iterate_current_item] = $link;
+                $this->info("-> Link encontrado: " . $iterate_current_item ." > " . $link);
+                continue;
+
+            } elseif (is_file($iterate_current_item) == true) {
+
+                if ($this->isPhpFile($iterate_current_item) == true) {
+
+                    // Arquivos PHP são ofuscados
+                    if ($this->obfuscateFile($iterate_current_item, $iterate_obfuscated_item) == true) {
+                        $this->info("- Arquivo " . $iterate_current_item . " ofuscado");
+                    } else {
+                        $this->error("x Arquivo " . $iterate_current_item . " não pôde ser ofuscado");
+                    }
+
+                } else {
+
+                    // Arquivos não-PHP são simplesmente copiados
+                    if (copy($iterate_current_item, $iterate_obfuscated_item) == true) {
+                        $this->info("- Arquivo " . $iterate_current_item . " mantido");
+                    } else {
+                        $this->error("x Arquivo " . $iterate_current_item . " não pôde ser copiado");
+                    }
+                }
+
+            } elseif (is_dir($iterate_current_item) ) {
+                $this->obfuscateDirectory($iterate_current_item, $iterate_obfuscated_item);
+            }
+        }
+
+        return true;
     }
 
     /**
      * Cria o diretório especificado no sistema de arquivos.
      *
-     * @param  string  $destiny
+     * @param  string  $path
      * @param  boolean $force
      * @return boolean
      */
-    protected function makeDestinyDir($destiny, $force = false)
+    protected function makeDir($path, $force = false)
     {
-        if (is_dir($destiny) && is_writable($destiny) == false) {
+        if (is_dir($path) && is_writable($path) == false) {
             // Diretório já existe, mas não é gravável
-            $this->error("O diretório {$destiny} já existe mas você não tem permissão para escrever nele");
+            $this->error("O diretório {$path} já existe mas você não tem permissão para escrever nele");
             return false;
 
-        } elseif (is_dir($destiny) == true) {
+        } elseif (is_dir($path) == true) {
             // O diretório já existe
-            $this->info("O diretório {$destiny} já existe");
+            $this->info("O diretório {$path} já existe");
             return true;
         }
 
-        if (@mkdir($destiny, 0755, $force) == true) {
-            // Tenta criar o diretório
-            $this->info("O diretório {$destiny} foi criado com sucesso");
+        if (@mkdir($path, 0755, $force) == true) {
             return true;
-
         } else {
-            $this->info("Não foi possível criar o diretório {$destiny}");
+            $this->info("Não foi possível criar o diretório {$path}");
             return false;
         }
 
@@ -99,128 +265,160 @@ abstract class BaseCommand extends Command
     }
 
     /**
-     * Cria o diretório de destino e grava nele os arquivos ofuscados.
+     * Verifica se o nome especificado é para um arquivo PHP.
      *
-     * @param  string $origin
-     * @param  string $destiny
+     * @param  string $filename
      * @return boolean
      */
-    protected function obfuscateDirectory($origin, $destiny)
+    protected function isPhpFile($filename)
     {
-        $this->line("-------------------------------------------------------");
-        $this->line("Ofuscando o diretório '{$origin}' para '{$destiny}'");
+        $extension = pathinfo($filename, PATHINFO_EXTENSION);
+        return (strtolower($extension) == 'php');
+    }
 
-        if ($this->makeDestinyDir($destiny) == false) {
+    /**
+     * Ofusca um arquivo PHP e salva o resultado no destino especificado.
+     *
+     * @param  string $php_file  Caminho completo até o arquivo PHP
+     * @param  string $obfuscated_file Localização do arquivo resultante da ofuscação
+     * @return bool
+     */
+    protected function obfuscateFile($php_file, $obfuscated_file)
+    {
+        $ob = $this->getObfuscator()->obfuscateFile($php_file);
+        if($ob == false) {
+            $this->error("Ocorreu um erro ao tentar ofuscar o arquivo");
+            $this->error("# {$php_file}");
             return false;
         }
 
-        if (is_readable($origin) == false) {
-            $this->error("Você não tem permissão para ler o diretório {$origin}");
+        if($ob->save($obfuscated_file) == false) {
+            $this->error("Ocorreu um erro ao tentar salvar o arquivo ofuscado");
+            $this->error("# {$obfuscated_file}");
             return false;
-        }
-
-        $list = scandir($origin);
-
-        foreach ($list as $item) {
-
-            if (in_array($item, ['.', '..']) ) {
-                continue;
-            }
-
-            if (is_link($origin . $this->ds . $item)) {
-
-                // LINKS
-                // Os links será recriados no final
-
-                $this->links[$origin . $this->ds . $item] = readlink($origin . $this->ds . $item);
-                $this->info("-> Link encontrado: " . $origin . $this->ds . $item
-                    ." > " . $this->links[$origin . $this->ds . $item]
-                    );
-                continue;
-
-            } elseif (is_file($origin . $this->ds . $item) == true) {
-
-                // ARQUIVOS
-
-                if ($this->isPhpFile($origin . $this->ds . $item) == true) {
-
-                    if ($this->obfuscateFile($origin . $this->ds . $item, $destiny . $this->ds . $item) == true) {
-                        $this->info("- Arquivo " . $origin . $this->ds . $item . " ofuscado");
-                    } else {
-                        $this->error("x Arquivo " . $origin . $this->ds . $item . " não pôde ser ofuscado");
-                    }
-
-                } else {
-
-                    // Arquivos não-PHP
-                    // Simplesmente copiados
-
-                    if (copy($origin . $this->ds . $item, $destiny . $this->ds . $item) == true) {
-                        $this->info("- Arquivo " . $origin . $this->ds . $item . " mantido");
-                    } else {
-                        $this->error("x Arquivo " . $origin . $this->ds . $item . " não pôde ser copiado");
-                    }
-                }
-
-            } elseif (is_dir($origin . $this->ds . $item) ) {
-
-                // DIRETÓRIOS
-                $this->obfuscateDirectory($origin . $this->ds . $item, $destiny . $this->ds . $item);
-
-            }
-
         }
 
         return true;
     }
 
     /**
-     * Devolve a lista de arquivos php no diretório especificado.
+     * Configura os arquivos resultantes do processo de ofuscação
+     * para que funcionem no mesmo ambiente que os originais funcionavem.
+     *
+     * @return bool
+     */
+    public function setupFiles()
+    {
+        $path_current = $this->getFilesPath();
+
+        // Faz o backup dos arquivos originais
+        if ($this->makeBackup() === false); {
+            return false;
+        }
+
+        // Gera uma lista com todos os arquivos PHP
+        // que foram ofuscados
+        $index = $this->makeIndex($path_current);
+
+        // Salva o arquivo contendo as funções
+        // que desfazem a ofuscação do código
+        $revert_file = $this->getUnpackFile();
+        if($this->getObfuscator()->saveRevertFile($revert_file) == false) {
+            $this->error("Ocorreu um erro ao tentar criar o arquivo de reversão");
+            return false;
+        }
+        $this->info("- Arquivo {$revert_file} criado com sucesso");
+
+        // Adiciona o arquivo de reversão como o
+        // primeiro da lista no autoloader
+        $index = array_merge([$revert_file], $index);
+
+        // Cria o autoloader com os arquivos ofuscados
+        if ($this->generateAutoloader($index) == false) {
+            $this->error("Não foi possível gerar o autoloader em {$path_current}");
+            return false;
+        }
+
+        return $this->setupComposer();
+    }
+
+    /**
+     * Efetua o backup dos arquivos originais.
+     *
+     * @param  string $path_current
+     * @param  string $path_obfuscated
+     * @param  string $path_backup
+     * @return bool
+     */
+    protected function makeBackup()
+    {
+        $path_current    = $this->getFilesPath();
+        $path_obfuscated = $this->getObfuscatedPath();
+        $path_backup     = $this->getBackupPath();
+
+        // Renomeia o diretório com os arquivos originais
+        // para um novo nome de backup
+        if (is_dir($path_backup) == true) {
+            $this->warning('Um backup efetuado anteriormente foi encontrado!');
+            $this->warning('O novo backup foi abortado para manter a integridade do backup original!');
+
+        } elseif(rename($path_current, $path_backup) === false) {
+            $this->error("Não foi possível fazer o backup de {$path_current}");
+            return false;
+        }
+
+        // Renomeia o diretório com os arquivos ofuscados
+        // para ser o novo diretório em execução
+        if(rename($path_obfuscated, $path_current) === false) {
+            $this->error("Não foi possível tornar {$path_obfuscated} o diretório efetivo");
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Devogera uma lista com os arquivos php
+     * contidos no diretório especificado.
      *
      * @param  string $destiny
      * @return array
      */
-    protected function indexDirectory($destiny)
+    protected function makeIndex($path)
     {
         $index = [];
 
         $this->line("-------------------------------------------------------");
-        $this->line("Indexando o diretório '{$destiny}'");
+        $this->line("Indexando o diretório '{$path}'");
 
-        $list = scandir($destiny);
-
+        $list = scandir($path);
         foreach ($list as $item) {
 
             if (in_array($item, ['.', '..']) ) {
                 continue;
             }
 
-            if (is_link($destiny . $this->ds . $item)) {
+            $iterator_index_item = $path . DIRECTORY_SEPARATOR . $item;
 
+            if (is_link($iterator_index_item)) {
                 // LINKS
                 // são ignorados neste ponto
                 continue;
 
-            } elseif (is_file($destiny . $this->ds . $item) == true) {
+            } elseif (is_file($iterator_index_item) == true) {
 
-                // ARQUIVOS
-
-                if ($this->isPhpFile($destiny . $this->ds . $item) == true) {
-
-                    $index[] = $destiny . $this->ds . $item;
-                    $this->info("- Arquivo " . $destiny . $this->ds . $item . " indexado");
-
+                if ($this->isPhpFile($iterator_index_item) == true) {
+                    $index[] = $iterator_index_item;
+                    $this->info("- Arquivo " . $iterator_index_item . " indexado");
                 } else {
-
                     // Arquivos não-PHP
                     // são ignorados neste ponto
                     continue;
                 }
 
-            } elseif (is_dir($destiny . $this->ds . $item) ) {
-
+            } elseif (is_dir($iterator_index_item) ) {
                 // DIRETÓRIOS
-                $list = $this->indexDirectory($destiny . $this->ds . $item);
+                $list = $this->makeIndex($iterator_index_item);
                 foreach ($list as $file) {
                     $index[] = $file;
                 }
@@ -231,18 +429,18 @@ abstract class BaseCommand extends Command
     }
 
     /**
-     * Gera um arquivo com a lista de requires.
+     * Gera um carregador para os arquivos ofuscados.
      *
      * @param  array $list_files
-     * @param  string $destiny
      * @return bool
      */
-    protected function generateAutoloader($list_files, $destiny)
+    protected function generateAutoloader($list_files)
     {
-        $autoloader_file = $destiny . $this->ds . 'autoloader.php';
+        $file = $this->getFilesPath() . DIRECTORY_SEPARATOR . 'autoloader.php';
 
-        // Remove o autoloader da lista
-        if (($key = array_search($autoloader_file, $list_files)) !== false) {
+        // Se o autoloader existir, remove-o da lista
+        // TODO: refatorar para isso não ser necessário jamais!!
+        if (($key = array_search($file, $list_files)) !== false) {
             unset($list_files[$key]);
         }
 
@@ -256,7 +454,8 @@ abstract class BaseCommand extends Command
         $contents .= "    require_once(\$file);\n";
         $contents .= "}\n\n";
 
-        if (file_put_contents($autoloader_file, $contents) !== false) {
+        if (file_put_contents($file, $contents) !== false) {
+            $this->info("- Autoloader {$file} criado com sucesso");
             return true;
         }
 
@@ -264,28 +463,40 @@ abstract class BaseCommand extends Command
     }
 
     /**
-     * Verifica se o arquivo especificado é um arquivo PHP.
+     * Configura o composer para usar os arquivos ofuscados
+     * no lugar dos originais.
      *
-     * @param  string $string
-     * @return boolean
+     * @return bool
      */
-    protected function isPhpFile($string)
+    protected function setupComposer()
     {
-        $extension = pathinfo($string, PATHINFO_EXTENSION);
-        return (strtolower($extension) == 'php');
-    }
+        // Atualiza o arquivo composer.json
+        $composer_file = $this->getComposerFile();
+        $contents = json_decode(file_get_contents($composer_file), true);
+        if (!isset($contents['autoload']['files'])) {
+            // Cria a seção files
+            $contents['autoload']['files'] = [];
+        }
 
-    protected function obfuscateFile($origin, $destiny)
-    {
-        $this->line("Ofuscando o arquivo '{$origin}' para '{$destiny}'");
+        $root_path = $this->getFilesPath();
+        $revert_file_relative = str_replace($root_path, '', $this->getUnpackFile());
+        if (array_search($revert_file_relative, $contents['autoload']['files']) !== false) {
+            // Adiciona o arquivo com prioridade
+            $contents['autoload']['files'] = array_merge(
+                [$revert_file_relative],
+                $contents['autoload']['files']
+            );
+        }
 
-        $ob = (new PhpObfuscator)->obfuscateFile($origin);
-        if($ob == false) {
-            $this->error("Ocorreu um erro ao tentar ofuscar o arquivo {$origin}");
+        if (file_put_contents($composer_file, json_encode($contents, JSON_PRETTY_PRINT)) === false) {
+            $this->error("Não foi possível atualizar o arquivo  {$composer_file}");
             return false;
         }
 
-        return $ob->save($destiny);
+        $this->info("O arquivo composer.json foi configurado com sucesso.");
+        $this->info("Execute \"composer dump-autoload\" para atualizar as rotinas de carregamento.");
+
+        return true;
     }
 
 }

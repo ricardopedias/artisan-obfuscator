@@ -29,7 +29,9 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
     public function register()
     {
 		$this->commands([
-            \Obfuscator\Commands\ObfuscateAppCommand::class
+            \Obfuscator\Commands\ObfuscateCommand::class,
+            //\Obfuscator\Commands\ObfuscateAppCommand::class,
+            //\Obfuscator\Commands\ObfuscatePkgCommand::class
         ]);
     }
 }

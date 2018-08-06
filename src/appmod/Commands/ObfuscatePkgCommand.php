@@ -11,7 +11,7 @@ namespace Obfuscator\Commands;
 
 use Illuminate\Console\Command;
 
-class ObfuscateAppCommand extends BaseCommand
+class ObfuscatePkgCommand extends BaseCommand
 {
     /**
      * Diretórios que, caso existam,
@@ -74,17 +74,6 @@ class ObfuscateAppCommand extends BaseCommand
     protected function getComposerFile()
     {
         return $this->getAppPath('composer.json');
-    }
-
-    /**
-     * Devolve o caminho completo até o arquivo compose.json responsávl
-     * pelo carregamento da aplicação.
-     *
-     * @return string
-     */
-    protected function getComposerJsonFile()
-    {
-        return $this->getBasePath() . DIRECTORY_SEPARATOR . 'composer.json';
     }
 
     /**
