@@ -8,7 +8,7 @@
 declare(strict_types=1);
 
 
-namespace Obfuscator;
+namespace ArtisanObfuscator;
 
 class Facade extends \Illuminate\Support\Facades\Facade
 {

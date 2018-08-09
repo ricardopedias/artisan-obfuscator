@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace Obfuscator\Commands;
+namespace ArtisanObfuscator\Commands;
 
 use Illuminate\Console\Command;
 
@@ -105,7 +105,7 @@ class ObfuscatePkgCommand extends BaseCommand
 
         // Salva o arquivo de reversão
         $revert_file = $path_app . $this->ds . $this->getFunctionsFilename();
-        $ob = $this->getObfuscator()->saveRevertFile($revert_file);
+        $ob = $this->getArtisanObfuscator()->saveRevertFile($revert_file);
         if($ob == false) {
             $this->error("Ocorreu um erro ao tentar gerar o arquivo de reversão");
             return false;

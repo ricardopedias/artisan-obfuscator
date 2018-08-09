@@ -1,7 +1,7 @@
 <?php
-namespace Obfuscator\Tests\Libs;
+namespace ArtisanObfuscator\Tests\Libs;
 
-use Obfuscator\Commands\BaseCommand;
+use ArtisanObfuscator\Commands\BaseCommand;
 
 class BaseObfuscateAccessor extends BaseCommand
 {

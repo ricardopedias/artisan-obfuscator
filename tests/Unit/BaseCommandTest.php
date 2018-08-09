@@ -1,9 +1,9 @@
 <?php
-namespace Obfuscator\Tests\Unit;
+namespace ArtisanObfuscator\Tests\Unit;
 
 use Tests\TestCase;
-use Obfuscator\Libs\PhpObfuscator;
-use Obfuscator\Tests\Libs\BaseObfuscateAccessor;
+use ArtisanObfuscator\Libs\PhpArtisanObfuscator;
+use ArtisanObfuscator\Tests\Libs\BaseObfuscateAccessor;
 
 class BaseCommandTest extends TestCase
 {
@@ -28,10 +28,10 @@ class BaseCommandTest extends TestCase
         return $temp_file;
     }
 
-    public function testGetObfuscator()
+    public function testGetArtisanObfuscator()
     {
-        $this->assertInstanceOf(PhpObfuscator::class,
-            (new BaseObfuscateAccessor)->method('getObfuscator'));
+        $this->assertInstanceOf(PhpArtisanObfuscator::class,
+            (new BaseObfuscateAccessor)->method('getArtisanObfuscator'));
     }
 
     //

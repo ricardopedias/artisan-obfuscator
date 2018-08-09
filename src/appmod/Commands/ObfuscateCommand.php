@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace Obfuscator\Commands;
+namespace ArtisanObfuscator\Commands;
 
 use Illuminate\Console\Command;
 

@@ -1,11 +1,11 @@
 <?php
-namespace Obfuscator\Tests\Unit;
+namespace ArtisanObfuscator\Tests\Unit;
 
 use Tests\TestCase;
-use Obfuscator\Tests\Libs\PhpObfuscatorAccessor;
-use Obfuscator\Libs\PhpObfuscator;
+use ArtisanObfuscator\Tests\Libs\PhpArtisanObfuscatorAccessor;
+use ArtisanObfuscator\Libs\PhpArtisanObfuscator;
 
-class PhpObfuscatorTest extends TestCase
+class PhpArtisanObfuscatorTest extends TestCase
 {
     private $errors;
 
@@ -45,7 +45,7 @@ class PhpObfuscatorTest extends TestCase
             $code = self::getTestFileContents($file);
             $this->assertContains('<?php', $code);
 
-            $removed = (new PhpObfuscatorAccessor)->accessPhpWrapperRemove($code);
+            $removed = (new PhpArtisanObfuscatorAccessor)->accessPhpWrapperRemove($code);
             $this->assertNotContains('<?php', $removed);
             $this->assertNotContains('?>', $removed);
 
@@ -60,7 +60,7 @@ class PhpObfuscatorTest extends TestCase
         $this->assertContains('<?=', $code);
         $this->assertContains('?>', $code);
 
-        $removed = (new PhpObfuscatorAccessor)->accessPhpWrapperRemove($code);
+        $removed = (new PhpArtisanObfuscatorAccessor)->accessPhpWrapperRemove($code);
         $this->assertFalse($removed);
     }
 
@@ -74,7 +74,7 @@ class PhpObfuscatorTest extends TestCase
 
             $string = self::getTestFileContents($file);
 
-            $ob = new PhpObfuscatorAccessor;
+            $ob = new PhpArtisanObfuscatorAccessor;
             $compressed = $ob->packerOnePack($string);
             $this->assertEquals($string, $ob->packerOneUnpack($compressed));
         }
@@ -86,7 +86,7 @@ class PhpObfuscatorTest extends TestCase
 
             $string = self::getTestFileContents($file);
 
-            $ob = new PhpObfuscatorAccessor;
+            $ob = new PhpArtisanObfuscatorAccessor;
             $compressed = $ob->packerTwoPack($string);
             $this->assertEquals($string, $ob->packerTwoUnpack($compressed));
         }
@@ -98,7 +98,7 @@ class PhpObfuscatorTest extends TestCase
 
             $string = self::getTestFileContents($file);
 
-            $ob = new PhpObfuscatorAccessor;
+            $ob = new PhpArtisanObfuscatorAccessor;
             $compressed = $ob->packerThreePack($string);
             $this->assertEquals($string, $ob->packerThreeUnpack($compressed));
         }
@@ -110,7 +110,7 @@ class PhpObfuscatorTest extends TestCase
 
     public function testGetPackerName()
     {
-        $ob = new PhpObfuscatorAccessor;
+        $ob = new PhpArtisanObfuscatorAccessor;
         // $list = $ob->getProperty('map_packer_functions');
         $name_one = $ob->accessGetPackerName();
         $name_two = $ob->accessGetPackerName();
@@ -119,7 +119,7 @@ class PhpObfuscatorTest extends TestCase
 
     public function testGetPackerMethodName()
     {
-        $ob = new PhpObfuscatorAccessor;
+        $ob = new PhpArtisanObfuscatorAccessor;
         // $list = $ob->getProperty('map_packer_functions');
         $name_one = $ob->accessGetPackerMethodName();
         $name_two = $ob->accessGetPackerMethodName();
@@ -128,7 +128,7 @@ class PhpObfuscatorTest extends TestCase
 
     public function testGetArgumenterName()
     {
-        $ob = new PhpObfuscatorAccessor;
+        $ob = new PhpArtisanObfuscatorAccessor;
         // $list = $ob->getProperty('map_argumenter_functions');
         $name_one = $ob->accessGetArgumenterName();
         $name_two = $ob->accessGetArgumenterName();
@@ -149,7 +149,7 @@ class PhpObfuscatorTest extends TestCase
         $saved_file = self::getTempFile();
 
         // Ofusca o arquivo e salva do disco
-        $ob = (new PhpObfuscator)->obfuscateFile($origin);
+        $ob = (new PhpArtisanObfuscator)->obfuscateFile($origin);
         $this->assertTrue($ob->save($saved_file));
 
         // Esta chamada deve emitir um erro no PHP
@@ -167,7 +167,7 @@ class PhpObfuscatorTest extends TestCase
         $saved_file = self::getTempFile();
 
         // Ofusca o arquivo e salva do disco
-        $ob = (new PhpObfuscator)->obfuscateFile($origin);
+        $ob = (new PhpArtisanObfuscator)->obfuscateFile($origin);
         $this->assertTrue($ob->save($saved_file));
 
         // Esta chamada deve emitir um erro no PHP
@@ -185,7 +185,7 @@ class PhpObfuscatorTest extends TestCase
         $saved_file = self::getTempFile();
 
         // Ofusca o arquivo e salva do disco
-        $ob = (new PhpObfuscator)->obfuscateFile($origin);
+        $ob = (new PhpArtisanObfuscator)->obfuscateFile($origin);
         $this->assertTrue($ob->save($saved_file));
 
         // Esta chamada deve emitir um erro no PHP
@@ -203,7 +203,7 @@ class PhpObfuscatorTest extends TestCase
         $saved_file = self::getTempFile();
 
         // Ofusca o arquivo e salva do disco
-        $ob = (new PhpObfuscator)->obfuscateFile($origin);
+        $ob = (new PhpArtisanObfuscator)->obfuscateFile($origin);
         $this->assertTrue($ob->save($saved_file));
 
         // Esta chamada deve emitir um erro no PHP
@@ -221,7 +221,7 @@ class PhpObfuscatorTest extends TestCase
         $saved_file = self::getTempFile();
 
         // Ofusca o arquivo e salva do disco
-        $ob = (new PhpObfuscator)->obfuscateFile($origin);
+        $ob = (new PhpArtisanObfuscator)->obfuscateFile($origin);
         $this->assertTrue($ob->save($saved_file));
 
         // Esta chamada deve emitir um erro no PHP
@@ -231,7 +231,7 @@ class PhpObfuscatorTest extends TestCase
 
     public function testGetRevertFileContents()
     {
-        $ob = (new PhpObfuscatorAccessor)->accessGetRevertFileContents();
+        $ob = (new PhpArtisanObfuscatorAccessor)->accessGetRevertFileContents();
         $this->assertTrue(true);
     }
 
@@ -242,7 +242,7 @@ class PhpObfuscatorTest extends TestCase
         $saved_revert_file = self::getTempFile('revert_obfuscate_');
 
         // Ofusca o arquivo e salva do disco
-        $ob = new PhpObfuscatorAccessor;
+        $ob = new PhpArtisanObfuscatorAccessor;
         $ob->obfuscateFile($origin);
         $this->assertTrue($ob->save($saved_file));
         $this->assertTrue($ob->saveRevertFile($saved_revert_file));
@@ -265,7 +265,7 @@ class PhpObfuscatorTest extends TestCase
         $saved_revert_file = self::getTempFile('revert_obfuscate_');
 
         // Ofusca o arquivo e salva do disco
-        $ob = new PhpObfuscatorAccessor;
+        $ob = new PhpArtisanObfuscatorAccessor;
         $ob->obfuscateFile($origin);
         $this->assertTrue($ob->save($saved_file));
         $this->assertTrue($ob->saveRevertFile($saved_revert_file));
@@ -287,7 +287,7 @@ class PhpObfuscatorTest extends TestCase
         $saved_revert_file = self::getTempFile('revert_obfuscate_');
 
         // Ofusca o arquivo e salva do disco
-        $ob = new PhpObfuscatorAccessor;
+        $ob = new PhpArtisanObfuscatorAccessor;
         $ob->obfuscateFile($origin);
         $this->assertTrue($ob->save($saved_file));
         $this->assertTrue($ob->saveRevertFile($saved_revert_file));
@@ -308,7 +308,7 @@ class PhpObfuscatorTest extends TestCase
         $saved_revert_file = self::getTempFile('revert_obfuscate_');
 
         // Ofusca o arquivo e salva do disco
-        $ob = new PhpObfuscatorAccessor;
+        $ob = new PhpArtisanObfuscatorAccessor;
         $ob->obfuscateFile($origin);
         $this->assertTrue($ob->save($saved_file));
         $this->assertTrue($ob->saveRevertFile($saved_revert_file));
@@ -330,7 +330,7 @@ class PhpObfuscatorTest extends TestCase
         $saved_revert_file = self::getTempFile('revert_obfuscate_');
 
         // Ofusca o arquivo e salva do disco
-        $ob = new PhpObfuscatorAccessor;
+        $ob = new PhpArtisanObfuscatorAccessor;
         $ob->obfuscateFile($origin);
         $this->assertTrue($ob->save($saved_file));
         $this->assertTrue($ob->saveRevertFile($saved_revert_file));

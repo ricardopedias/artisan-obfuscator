@@ -1,9 +1,9 @@
 <?php
-namespace Obfuscator\Tests\Libs;
+namespace ArtisanObfuscator\Tests\Libs;
 
-use Obfuscator\Libs\PhpObfuscator;
+use ArtisanObfuscator\Libs\PhpArtisanObfuscator;
 
-class PhpObfuscatorAccessor extends PhpObfuscator
+class PhpArtisanObfuscatorAccessor extends PhpArtisanObfuscator
 {
     public function getProperty($name)
     {

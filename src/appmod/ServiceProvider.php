@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace Obfuscator;
+namespace ArtisanObfuscator;
 
 class ServiceProvider extends \Illuminate\Support\ServiceProvider
 {
@@ -28,10 +28,9 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
      */
     public function register()
     {
-		$this->commands([
-            \Obfuscator\Commands\ObfuscateCommand::class,
-            //\Obfuscator\Commands\ObfuscateAppCommand::class,
-            //\Obfuscator\Commands\ObfuscatePkgCommand::class
+        $this->commands([
+            \ArtisanObfuscator\Commands\ObfuscateAppCommand::class,
+            //\ArtisanObfuscator\Commands\ObfuscatePkgCommand::class
         ]);
     }
 }
