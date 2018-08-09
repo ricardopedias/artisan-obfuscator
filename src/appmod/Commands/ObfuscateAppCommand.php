@@ -107,10 +107,6 @@ class ObfuscateAppCommand extends BaseCommand
             return false;
         }
 
-        // $autoloader_file = $this->getAutoloaderFile();
-        // $app_file = $this->getAppFile();
-        // dd($autoloader_file, $app_file);
-
         if ($this->makeBackup() == false) {
             return false;
         }
@@ -119,9 +115,11 @@ class ObfuscateAppCommand extends BaseCommand
             return false;
         }
 
+        echo shell_exec("composer dump-autoload");
+
         $this->info("A aplicação foi ofuscada com sucesso");
         $this->info("Um backup da aplicação original se encontra em {$path_backup}");
-        $this->info("Execute \"composer dump-autoload\" para atualizar o carregador.");
+        //$this->info("Execute \"composer dump-autoload\" para atualizar o carregador.");
     }
 
 }

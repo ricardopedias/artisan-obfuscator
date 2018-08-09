@@ -160,7 +160,8 @@ abstract class BaseCommand extends Command
             );
         }
 
-        if (file_put_contents($composer_file, json_encode($contents, JSON_PRETTY_PRINT)) === false) {
+        $json_contents = str_replace("\\/", "/", json_encode($contents, JSON_PRETTY_PRINT));
+        if (file_put_contents($composer_file, $json_contents) === false) {
             $this->error("Could not update composer.json file");
             return false;
         }
