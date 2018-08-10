@@ -30,7 +30,7 @@ class ServiceProvider extends \Illuminate\Support\ServiceProvider
     {
         $this->commands([
             \ArtisanObfuscator\Commands\ObfuscateAppCommand::class,
-            //\ArtisanObfuscator\Commands\ObfuscatePkgCommand::class
+            \ArtisanObfuscator\Commands\ObfuscatePkgCommand::class
         ]);
     }
 }

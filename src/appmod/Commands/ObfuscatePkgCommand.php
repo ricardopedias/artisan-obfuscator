@@ -10,71 +10,25 @@ declare(strict_types=1);
 namespace ArtisanObfuscator\Commands;
 
 use Illuminate\Console\Command;
+use ArtisanObfuscator\Services\ObfuscatePkg;
 
-class ObfuscatePkgCommand extends BaseCommand
+class ObfuscatePkgCommand extends Command
 {
-    /**
-     * Diretórios que, caso existam,
-     * não serão ofuscados em nenhuma hipótese.
-     *
-     * @var array
-     */
-    private $exclude_dirs = [
-        'vendor',
-        'node_modules',
-    ];
-
-    /**
-     * Arquivos que, caso existam,
-     * não serão ofuscados em nenhuma hipótese
-     *
-     * @var array
-     */
-    private $exclude_files = [
-        '.env',
-    ];
-
     /**
      * Assinatuta do comando no terminal.
      *
      * @var string
      */
-    protected $signature = 'obfuscate:app
-                            {composerfile? : Caminho completo até o arquivo composer.json da aplicação}
-                            {appdir? : Nome do diretório com a aplicação ofuscada}
-                            ';
+    protected $signature = 'obfuscate:pkg
+        {package_path : O caminho completo até o diretório src do pacote a ser ofuscado}
+        {composer_file? : O caminho completo até o arquivo composer.json do pacote}';
 
     /**
      * Descrição do comando no terminal
      *
      * @var string
      */
-    protected $description = 'Ofusca o código PHP contido em uma aplicação Laravel para ser distribuido sem possibilitar sua leitura';
-
-    /**
-     * Devolve a localização completa até o arquivo que conterá as funções de reversão.
-     * Este arquivo sejá gerado pelo processo de ofuscação automaticamente
-     * e adicionado no arquivo 'autoloader.php' da aplicação.
-     *
-     * @abstract
-     * @return string
-     */
-    protected function getUnpackFunctionsFile()
-    {
-        return $this->getAppPath('app/App.php');
-    }
-
-    /**
-     * Devolve o caminho completo até o arquivo 'composer.json', usado para
-     * disponibbilizar os arquivos da aplicação.
-     *
-     * @abstract
-     * @return string
-     */
-    protected function getComposerFile()
-    {
-        return $this->getAppPath('composer.json');
-    }
+    protected $description = 'Faz um backup e ofusca um pacote do laravel';
 
     /**
      * Executa o algoritmo do comando de terminal.
@@ -83,44 +37,32 @@ class ObfuscatePkgCommand extends BaseCommand
      */
     public function handle()
     {
-        // nome do diretório ofuscado
-        $appob_name = $this->argument('appob') ?? 'appob';
+        $command = new ObfuscatePkg;
+        $command->setArguments($this->arguments());
 
-        // Caminho ao diretório ofuscado
-        $path_appob  = $this->parsePath($appob_name);
+        if ($command->execute() === true) {
 
-        // Caminho ao diretório original
-        $path_app  = $this->parsePath('app');
+            echo shell_exec("composer dump-autoload");
 
-        // Ofusca o diretório
-        if ($this->obfuscateDirectory($path_app, $path_appob) == false) {
-            $this->error("Erros ocorreram ao tentar ofuscar o diretório {$path_app}");
+            $this->info("A aplicação foi ofuscada com sucesso");
+            $path_backup = $command->getBackupPath();
+            $this->info("Um backup da aplicação original se encontra em {$path_backup}");
+
+            return true;
         }
 
-        // Renomeia o diretório ofuscado e efetua o backup do original
-        $this->renameObfuscatedResult($path_app, $path_appob);
-
-        // Gera uma lista com todos os arquivos PHP
-        $index = $this->indexDirectory($path_app);
-
-        // Salva o arquivo de reversão
-        $revert_file = $path_app . $this->ds . $this->getFunctionsFilename();
-        $ob = $this->getArtisanObfuscator()->saveRevertFile($revert_file);
-        if($ob == false) {
-            $this->error("Ocorreu um erro ao tentar gerar o arquivo de reversão");
-            return false;
+        $errors = $command->getObfuscator()->getErrorMessages();
+        foreach ($errors as $message) {
+            $this->error($message);
         }
 
-        $static_loader = array_merge([$revert_file], $index);
-
-        if ($this->generateAutoloader($index, $path_app) == false) {
-            $this->error("Não foi possível gerar o autoloader para {$path_app}");
+        $runtime = $command->getObfuscator()->getRuntimeMessages();
+        foreach ($runtime as $message) {
+            $this->info($message);
         }
 
-        $this->updateComposerJson();
+        return false;
 
-        $this->info("A aplicação foi ofuscada com sucesso para o diretório {$path_app}");
-        $this->info("A aplicação original foi movida para backup");
     }
 
 }

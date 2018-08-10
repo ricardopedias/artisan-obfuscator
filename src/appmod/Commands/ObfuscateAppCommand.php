@@ -10,8 +10,9 @@ declare(strict_types=1);
 namespace ArtisanObfuscator\Commands;
 
 use Illuminate\Console\Command;
+use ArtisanObfuscator\Services\ObfuscateApp;
 
-class ObfuscateAppCommand extends BaseCommand
+class ObfuscateAppCommand extends Command
 {
     /**
      * Assinatuta do comando no terminal.
@@ -28,98 +29,37 @@ class ObfuscateAppCommand extends BaseCommand
     protected $description = 'Faz um backup e ofusca um projeto contido no diretório app do laravel';
 
     /**
-     * Devolve o caminho completo até o diretório que será ofuscado.
-     *
-     * @abstract
-     * @return string
-     */
-    protected function getPlainPath() : string
-    {
-        return base_path('app');
-    }
-
-    /**
-     * Devolve o caminho completo até o diretório que será usado para backup.
-     *
-     * @abstract
-     * @return string
-     */
-    protected function getBackupPath() : string
-    {
-        return base_path('app_backup');
-    }
-
-    /**
-     * Devolve o caminho completo até o diretório que será usado para backup.
-     *
-     * @abstract
-     * @return string
-     */
-    protected function getObfuscatedPath() : string
-    {
-        return $this->getPlainPath() . '_obfuscated';
-    }
-
-    /**
-     * Devolve o caminho completo até o arquivo 'composer.json', usado para
-     * disponibbilizar os arquivos da aplicação Laravel.
-     *
-     * @abstract
-     * @return string
-     */
-    protected function getComposerJsonFile() : string
-    {
-        return base_path('composer.json');
-    }
-
-    /**
      * Executa o algoritmo do comando de terminal.
      *
      * @return mixed
      */
     public function handle()
     {
-        $path_plain      = $this->getPlainPath();
-        $path_obfuscated = $this->getObfuscatedPath();
-        $path_backup     = $this->getBackupPath();
+        $command = new ObfuscateApp;
+        $command->setArguments($this->arguments());
 
-        $ob = $this->getObfuscator();
-        $ob->setUnpackFile('App.php');
+        if ($command->execute() === true) {
 
-        if ($ob->obfuscateDirectory($path_plain) == false) {
-            foreach ($ob->getErrorMessages() as $message) {
-                $this->error($message);
-            }
-            return false;
+            echo shell_exec("composer dump-autoload");
+
+            $this->info("A aplicação foi ofuscada com sucesso");
+            $path_backup = $command->getBackupPath();
+            $this->info("Um backup da aplicação original se encontra em {$path_backup}");
+
+            return true;
         }
 
-        if ($ob->makeDir($path_obfuscated) == false) {
-            foreach ($ob->getErrorMessages() as $message) {
-                $this->error($message);
-            }
-            return false;
+        $errors = $command->getObfuscator()->getErrorMessages();
+        foreach ($errors as $message) {
+            $this->error($message);
         }
 
-        if($ob->saveDirectory($path_obfuscated) == false) {
-            foreach ($ob->getErrorMessages() as $message) {
-                $this->error($message);
-            }
-            return false;
+        $runtime = $command->getObfuscator()->getRuntimeMessages();
+        foreach ($runtime as $message) {
+            $this->info($message);
         }
 
-        if ($this->makeBackup() == false) {
-            return false;
-        }
-
-        if ($this->setupComposer() == false) {
-            return false;
-        }
-
-        echo shell_exec("composer dump-autoload");
-
-        $this->info("A aplicação foi ofuscada com sucesso");
-        $this->info("Um backup da aplicação original se encontra em {$path_backup}");
-        //$this->info("Execute \"composer dump-autoload\" para atualizar o carregador.");
+        return false;
     }
 
 }
