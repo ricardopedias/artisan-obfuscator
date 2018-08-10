@@ -78,4 +78,13 @@ class ObfuscatePkg extends BaseObfuscator
 
         return $json_file;
     }
+
+    public function execute()
+    {
+        parent::execute()
+
+        // TODO
+        // Remover ofuscação do Service Provider e
+        // adicionar a chamada do autoloader nele
+    }
 }
