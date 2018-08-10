@@ -25,9 +25,9 @@ Sinta-se à vontade para conferir os [releases](https://github.com/rpdesignerfly
 
   ## Sumário
 
-    1. [Sobre](docs/01-About.md)
-    2. [Instalação](docs/02-Installation.md)
-    3. [Como Usar](docs/03-Usage.md)
+1. [Sobre](docs/01-About.md)
+2. [Instalação](docs/02-Installation.md)
+3. [Como Usar](docs/03-Usage.md)
 
 ## Creditos
 
